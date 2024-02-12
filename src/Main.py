@@ -23,7 +23,7 @@ def boardGraphics(screen, gameState):
     for each game state.
     '''
 
-    def drawTiles(screen):
+    def _drawTiles(screen):
         '''Generate tiles on the board.'''
 
         colors = np.array([pg.Color("#FFF8DC"), pg.Color("#724A2F")]) # Light red, red
@@ -36,7 +36,7 @@ def boardGraphics(screen, gameState):
                     color = colors[1]
                 pg.draw.rect(screen, color, pg.Rect(col*PIECE_SIZE, row*PIECE_SIZE, PIECE_SIZE, PIECE_SIZE))
                      
-    def drawPieces(screen, board):
+    def _drawPieces(screen, board):
         '''Place pieces within tiles.'''
         
         for row in range(BOARD_SIZE):
@@ -46,8 +46,8 @@ def boardGraphics(screen, gameState):
                     screen.blit(IMAGES[piece], pg.Rect(col*PIECE_SIZE, row*PIECE_SIZE, PIECE_SIZE, PIECE_SIZE))
         pass
 
-    drawTiles(screen)
-    drawPieces(screen, gameState.board)
+    _drawTiles(screen)
+    _drawPieces(screen, gameState.board)
 
 def main():
     pg.init()
@@ -63,10 +63,31 @@ def main():
     loadPieces()
 
     running = True
-    while running:
+    selectedPiece = () # No piece is selected
+    playerClicks = [] # Keeps track of player clicks
+
+    while (running):
         for event in pg.event.get():
-            if event.type == pg.QUIT:
+            if (event.type == pg.QUIT):
                 running = False
+            elif (event.type == pg.MOUSEBUTTONDOWN):
+                location = pg.mouse.get_pos() # (x, y) location of mouse
+                col = location[0] // PIECE_SIZE
+                row = location[1] // PIECE_SIZE
+                
+                if (selectedPiece == (row, col)): # The user selected the same piece twice
+                    selectedPiece = (row, col)
+                    playerClicks = [] # Reset
+                else: 
+                    selectedPiece = (row, col)
+                    playerClicks.append(selectedPiece) 
+                if (len(playerClicks) == 2): # 2nd click
+                    move = Engine.Move(playerClicks[0], playerClicks[1], gameState.board)
+                    print(move.getChessNotation())
+
+                    gameState.makeMove(move)
+                    selectedPiece = () # Reset
+                    playerClicks = []
 
         boardGraphics(screen, gameState) 
         clock.tick(MAX_FPS)  # Control the frame rate
