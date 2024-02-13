@@ -26,14 +26,20 @@ class GameState:
         '''
 
         board = self.getBoard()
-        start_row, start_col = move.startRow, move.startCol
+        piece = board[move.startRow, move.startCol]
 
-        if (board[start_row, start_col] == 'wp'): # Pawn
+        if (piece == 'wp'): # Pawn
             self._pawn(move)
-        elif (board[start_row, start_col] == 'wR'): # Rook
+        elif (piece == 'wR'): # Rook
             self._rook(move)
-        elif (board[start_row, start_col] == 'wN'): # Knight
+        elif (piece == 'wN'): # Knight
             self._knight(move)
+        elif (piece == 'wB'):
+            self._bishop(move)
+        elif (piece == 'wK'):
+            self._king(move)
+        elif (piece == 'wQ'):
+            self._queen(move)
 
     def _update(self, move):
         '''
@@ -61,43 +67,89 @@ class GameState:
 
         board = self.getBoard()
         
-        if (move.startCol != move.endCol):
-            return board # If the columns are changed, keep the board
-        elif (move.startRow > move.endRow + 2):
-            return board # If moved more than 2 spaces, keep the board
-        self._update(move) # Otherwise, update the state
+        if (move.startCol != move.endCol) or (move.startRow > move.endRow + 2):
+            return None  # If the columns are changed or moved more than 2 spaces, no move is made
+        self._update(move)  # Otherwise, update the state
+
     
     def _rook(self, move):
         '''Defines the rules for a chess rook.'''
 
-        board = self.getBoard()
-
         # Can only move along the rows or columns; no diagonals
         if (move.startCol != move.endCol) and (move.startRow != move.endRow):
-            return board 
-
+            return None
         self._update(move)
     
     def _knight(self, move):
         '''Defines the rules for a chess knight.'''
 
         board = self.getBoard()
-        # All the possible moves relative to the knight
+        size = len(board)
+        # All  possible moves relative to the knight
         knightPositions = np.array([(2, -1), (2, 1), (-2, -1), (-2, 1),
                            (1, -2), (1, 2), (-1, -2), (-1, 2)])
         
-        # Unpack the tuples and repeatedly check for a match
-        for dr, dc in knightPositions: 
-            try:
-                if (move.startRow+dr, move.startCol+dc) == (move.endRow, move.endCol):
-                    self._update(move)
-                    break
-            except IndexError: 
-                continue 
-        return board
-        
+        match = False 
+        for dr, dc in knightPositions: # Loop through moves
+            movedRow = move.startRow + dr
+            movedCol = move.startCol + dc
+            # Determine whether player's move matches with any valid moves
+            if (0 <= movedRow < size) and (0 <= movedCol < size) and (movedRow, movedCol) == (move.endRow, move.endCol):
+                match = True 
 
-class Move():s
+        if (not match):
+            return None # If no matches, keep the board
+        self._update(move)
+    
+    def _bishop(self, move):
+        '''Defines the rules for a chess bishop.'''
+
+        dy = move.endCol - move.startCol
+        dx = move.endRow - move.startRow
+
+        if (dx == 0): return None  # Division by 0
+
+        slope = (dy)/(dx)
+        # Bishop can move anywhere with a slope of 1
+        if (abs(slope) != 1.0):
+            return None
+        self._update(move)
+    
+    def _king(self, move):
+        '''Defines the rules for a chess king.'''
+
+        dx = (move.endRow - move.startRow)
+        dy = (move.endCol - move.startCol)
+
+        # Can move anywhere with a radius of 1
+        if (abs(dx) > 1 or abs(dy) > 1):
+            return None # Otherwise, keep the board
+        self._update(move)
+
+    def _queen(self, move):
+        '''Defines the rules for a chess queen.'''
+
+        # Rook logic
+        if (move.startCol == move.endCol) or (move.startRow == move.endRow):
+            self._update(move)
+
+        # Bishop logic
+        dy = move.endCol - move.startCol
+        dx = move.endRow - move.startRow
+
+        if (dx == 0): return None 
+
+        slope = (dy/dx)
+        if (abs(slope) != 1.0):
+            return None
+        self._update(move)
+
+
+
+
+
+
+class Move():
     ranksToRows = {"1": 7, "2": 6, "3": 5, "4": 4, "5": 3, "6": 2, "7": 1, "8": 0}
     rowsToRanks = {values: key for key, values in ranksToRows.items()} # Reverses ranksToRows
 

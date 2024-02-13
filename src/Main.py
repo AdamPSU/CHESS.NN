@@ -72,8 +72,7 @@ def main():
                 running = False
             elif (event.type == pg.MOUSEBUTTONDOWN):
                 location = pg.mouse.get_pos() # (x, y) location of mouse
-                col = location[0] // PIECE_SIZE
-                row = location[1] // PIECE_SIZE
+                col, row = (location[0] // PIECE_SIZE), (location[1] // PIECE_SIZE)
                 
                 if (selectedPiece == (row, col)): # The user selected the same piece twice
                     selectedPiece = (row, col)
@@ -84,6 +83,7 @@ def main():
                 if (len(playerClicks) == 2): # 2nd click
                     move = Engine.Move(playerClicks[0], playerClicks[1], gameState.board)
                     print(move.getChessNotation())
+                    print(playerClicks)
 
                     gameState.makeMove(move)
                     selectedPiece = () # Reset
