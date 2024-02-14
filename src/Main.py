@@ -80,14 +80,14 @@ def main():
                 else: 
                     selectedPiece = (row, col)
                     playerClicks.append(selectedPiece) 
+
                 if (len(playerClicks) == 2): # 2nd click
                     move = Engine.Move(playerClicks[0], playerClicks[1], gameState.board)
-                    print(move.getChessNotation())
-                    print(playerClicks)
+                    if (gameState.isValid(move)):
+                        gameState.makeMove(move)
+                        print(playerClicks)
 
-                    gameState.makeMove(move)
-                    selectedPiece = () # Reset
-                    playerClicks = []
+                    selectedPiece, playerClicks = (), [] # Reset
 
         boardGraphics(screen, gameState) 
         clock.tick(MAX_FPS)  # Control the frame rate
