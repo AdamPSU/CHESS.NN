@@ -2,10 +2,11 @@ import pygame as pg
 import numpy as np
 import Engine
 
-WIDTH = HEIGHT = 576
+WIDTH = 864
+HEIGHT = 864
 BOARD_SIZE = 8 
 PIECE_SIZE = HEIGHT // BOARD_SIZE
-MAX_FPS = 15
+MAX_FPS = 60
 IMAGES = {} 
 
 def loadPieces():
@@ -26,7 +27,7 @@ def boardGraphics(screen, gameState):
     def _drawTiles(screen):
         '''Generate tiles on the board.'''
 
-        colors = np.array([pg.Color("#FFF8DC"), pg.Color("#724A2F")]) # Light red, red
+        colors = np.array([pg.Color("#F7FCFC"), pg.Color("#C7D4D4")]) # Light gray, gray # Light red, red
         
         for row in range(BOARD_SIZE):
             for col in range(BOARD_SIZE):
@@ -73,19 +74,27 @@ def main():
             elif (event.type == pg.MOUSEBUTTONDOWN):
                 location = pg.mouse.get_pos() # (x, y) location of mouse
                 col, row = (location[0] // PIECE_SIZE), (location[1] // PIECE_SIZE)
-                
+
                 if (selectedPiece == (row, col)): # The user selected the same piece twice
+                    selectedPiece = (row, col)
+                    playerClicks = [] # Reset
+                elif (col > BOARD_SIZE - 1 or row > BOARD_SIZE - 1):
                     selectedPiece = (row, col)
                     playerClicks = [] # Reset
                 else: 
                     selectedPiece = (row, col)
                     playerClicks.append(selectedPiece) 
 
+                    # If 1st click and an empty square is selected, reset
+                    if (len(playerClicks) == 1) and (gameState.board[row, col] == '--'): 
+                        playerClicks = [] 
+                        selectedPiece = ()
+                        
                 if (len(playerClicks) == 2): # 2nd click
-                    move = Engine.Move(playerClicks[0], playerClicks[1], gameState.board)
+                    move = Engine.Move(gameState.board, playerClicks[0], playerClicks[1])
+                    # Check if the move is valid before playing it
                     if (gameState.isValid(move)):
                         gameState.makeMove(move)
-                        print(playerClicks)
 
                     selectedPiece, playerClicks = (), [] # Reset
 
