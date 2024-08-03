@@ -1,5 +1,4 @@
 import numpy as np 
-import pygame as pg
 
 class Game:
     def __init__(self):

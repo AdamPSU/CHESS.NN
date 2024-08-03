@@ -1,22 +1,25 @@
 import pygame as pg
 import numpy as np
-from Engine.engine import Game, Move
+from engine.chess import Game, Move
 
 from src.config import *
 
-def load_pieces():
-    """Load chess pieces. This will only be done ONCE."""
+def _load_pieces():
+    """
+    Load chess pieces. This will only be done once, at the start of the
+    program's execution.
+    """
 
-    # 'b' prefix denotes black pieces, 'w' represents white
-    pieces = np.array(['bR', 'bN', 'bB', 'bK', 'bQ', 'bB', 'bN', 'bR', 'bp',
-                       'wR', 'wN', 'wB', 'wK', 'wQ', 'wB', 'wN', 'wR', 'wp'])
+    # 'b' prefixes for black pieces, 'w' for white pieces
+    pieces = ['bR', 'bN', 'bB', 'bK', 'bQ', 'bB', 'bN', 'bR', 'bp',
+              'wR', 'wN', 'wB', 'wK', 'wQ', 'wB', 'wN', 'wR', 'wp']
 
     for piece in pieces:
         IMAGES[piece] = pg.transform.scale(pg.image.load("../images/" + piece + ".png"),
                                            size=(PIECE_SIZE, PIECE_SIZE))
 
 
-def graphics(screen, game):
+def _graphics(screen, game):
     """
     Responsible for generating and updating GUI graphics
     for each game state.
@@ -42,60 +45,107 @@ def graphics(screen, game):
                 screen.blit(IMAGES[piece], pg.Rect(col*PIECE_SIZE, row*PIECE_SIZE, PIECE_SIZE, PIECE_SIZE))
 
 
-def main():
-    pg.init()
-    
-    screen = pg.display.set_mode((WIDTH, HEIGHT))
-    icon = pg.image.load("../images/bK.png")
+class Chess:
+    def __init__(self):
+        pg.init()
 
-    pg.display.set_caption("CHESS-NN")
-    pg.display.set_icon(icon)
-    clock = pg.time.Clock()
+        self.screen = pg.display.set_mode((WIDTH, HEIGHT))
+        self.icon = pg.image.load("../images/bK.png")
 
-    game = Game()
-    load_pieces()
+        pg.display.set_caption("CHESS-NN")
+        pg.display.set_icon(self.icon)
+        self.clock = pg.time.Clock()
 
-    selectedPiece = () # No piece is selected
-    playerClicks = [] # Keeps track of player clicks
-    
-    running = True
+        self.game = Game()
+        _load_pieces()
 
-    while running:
-        for event in pg.event.get():
-            if event.type == pg.QUIT:
-                running = False
-            elif event.type == pg.MOUSEBUTTONDOWN:
-                location = pg.mouse.get_pos() # (x, y) location of mouse
-                col, row = (location[0] // PIECE_SIZE), (location[1] // PIECE_SIZE)
+        self.clicked_piece = ()  # No piece is selected
+        self.click_logger = []  # Keeps track of player clicks
 
-                if selectedPiece == (row, col): # The user selected the same piece twice
-                    selectedPiece = (row, col)
-                    playerClicks = [] # Reset
-                elif col > BOARD_SIZE - 1 or row > BOARD_SIZE - 1:
-                    selectedPiece = (row, col)
-                    playerClicks = [] # Reset
-                else: 
-                    selectedPiece = (row, col)
-                    playerClicks.append(selectedPiece) 
+        self.running = True
 
-                    # If 1st click and an empty square is selected, reset
-                    if (len(playerClicks) == 1) and (game.board[row, col] == EMPTY):
-                        playerClicks = [] 
-                        selectedPiece = ()
-                        
-                if len(playerClicks) == 2: # 2nd click
-                    move = Move(game.board, playerClicks[0], playerClicks[1])
-                    # Check if the move is valid before playing it
-                    if game.isValid(move):
-                        game.makeMove(move)
 
-                    selectedPiece, playerClicks = (), [] # Reset
+    def reset_move(self):
+        """
+        Resets the selected piece and player clicks. This method is called
+        to clear the selection state, either when an invalid move is detected
+        or a valid move is completed.
+        """
 
-        graphics(screen, game)
-        clock.tick(MAX_FPS)  # Control the frame rate
-        pg.display.flip()  # Update the display
+        self.clicked_piece = ()
+        self.click_logger = []
 
-    pg.quit()
+
+    def move_handler(self, row, col):
+        """
+        Handles player clicks on the chessboard.
+
+        Parameters:
+        row (int): The row index of the clicked square.
+        col (int): The column index of the clicked square.
+
+        This method handles the logic for selecting and moving pieces on the board.
+        It checks for invalid clicks (e.g., clicking the same piece twice or clicking
+        out of bounds), validates the move, and updates the game state accordingly.
+        """
+
+        # Player clicked the same piece twice
+        if self.clicked_piece == (row, col):
+            self.reset_move()
+
+            return
+
+        bounds = BOARD_SIZE - 1
+
+        # Player clicked out of bounds
+        if col > bounds or row > bounds:
+            self.reset_move()
+
+            return
+
+        self.clicked_piece = (row, col)
+        self.click_logger.append(self.clicked_piece)
+
+        total_clicks = len(self.click_logger)
+        chess_piece = self.game.board[row, col]
+
+        # If 1st click and empty square is selected, restart
+        if total_clicks == 1 and chess_piece == EMPTY:
+            self.reset_move()
+
+        if total_clicks == 2:
+            move = Move(self.game.board, self.click_logger[0], self.click_logger[1])
+            is_valid = self.game.isValid(move)
+
+            # Check if the move is valid before playing it
+            if is_valid:
+                self.game.makeMove(move)
+
+            self.reset_move()
+
+
+    def run(self):
+        """Run the chess game."""
+
+        while self.running:
+            for event in pg.event.get():
+                if event.type == pg.QUIT:
+                    self.running = False
+                elif event.type == pg.MOUSEBUTTONDOWN:
+                    pos = pg.mouse.get_pos()  # Location of mouse on the chess board
+
+                    col = pos[0] // PIECE_SIZE
+                    row = pos[1] // PIECE_SIZE
+
+                    self.move_handler(row, col)
+
+            _graphics(self.screen, self.game)
+            self.clock.tick(MAX_FPS)  # Control the frame rate
+            pg.display.flip()  # Update the display
+
+        pg.quit()
+
 
 if __name__ == '__main__':
-    main()
+    chess = Chess()
+    chess.run()
