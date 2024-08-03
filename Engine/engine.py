@@ -1,7 +1,7 @@
 import numpy as np 
 import pygame as pg
 
-class GameState:
+class Game:
     def __init__(self):
         self.board = np.array(
             [['bR', 'bN', 'bB', 'bQ', 'bK', 'bB', 'bN', 'bR'],
@@ -16,20 +16,24 @@ class GameState:
 
         self.whiteToMove = True
         self.moveLog = [] # For debugging
-    
+
+
     def getBoard(self):
         return self.board
-    
+
+
     def getPiece(self, move):
         board = self.getBoard()
         return board[move.startRow, move.startCol]
 
+
     def getAttackedPiece(self, move):
         board = self.getBoard()
         return board[move.endRow, move.endCol]
-    
+
+
     def isValid(self, move): 
-        '''Logic for determining whether a move is valid/invalid.'''
+        """Logic for determining whether a move is valid/invalid."""
         
         piece = self.getPiece(move)
 
@@ -370,7 +374,7 @@ class MoveGenerator:
 
         
         
-class Move():
+class Move:
     ranksToRows = {"1": 7, "2": 6, "3": 5, "4": 4, "5": 3, "6": 2, "7": 1, "8": 0}
     rowsToRanks = {values: key for key, values in ranksToRows.items()} # Reverses ranksToRows
 
@@ -383,7 +387,7 @@ class Move():
 
         self.pieceMoved = board[self.startRow, self.startCol]
 
-        if (endSquare is not None):
+        if endSquare is not None:
             self.endRow = endSquare[0]
             self.endCol = endSquare[1]
 
