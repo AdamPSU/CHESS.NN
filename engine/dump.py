@@ -18,7 +18,6 @@ CHESS_BOARD =[['bR', 'bN', 'bB', 'bQ', 'bK', 'bB', 'bN', 'bR'],
               ['wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp'],
               ['wR', 'wN', 'wB', 'wQ', 'wK', 'wB', 'wN', 'wR']]
 
-
 PIECE_MAP = {
     'p': Pawn(),
     'N': Knight(),
@@ -181,8 +180,6 @@ class Game:
 
         move.log_move()
         return False
-
-
 
 
 # if __name__ == '__main__':

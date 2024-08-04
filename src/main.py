@@ -99,34 +99,39 @@ class Chess:
         out of bounds), validates the move, and updates the game state accordingly.
         """
 
+
         self.move_logger.append((row, col))
         total_clicks = len(self.move_logger)
 
         piece = self.game.board[row][col]
         self.piece_logger.append(piece)
 
-        # Player's first move is an empty piece
-        if piece == EMPTY and total_clicks == 1:
-            self.reset_move()
-            
-            return
-
-        white_to_move = self.game.white_to_move
-        is_white = True if self.piece_logger[0][0] == 'w' else False
-
-        print(white_to_move, piece[0])
-        if white_to_move and not is_white and total_clicks == 1:
-            self.reset_move()
-
-            return
-
-        bounds = BOARD_SIZE - 1
-
         # Player clicked out of bounds
-        if col > bounds or row > bounds:
+        if col > BOUNDS or row > BOUNDS:
             self.reset_move()
 
             return
+
+        if total_clicks == 1:
+            # Player's first move is an empty piece
+            if piece == EMPTY:
+                self.reset_move()
+
+                return
+
+            white_to_move = self.game.white_to_move
+            is_white_piece = True if self.piece_logger[0][0] == 'w' else False
+
+            if white_to_move:
+                if not is_white_piece:
+                    self.reset_move()
+
+                    return
+            else:
+                if is_white_piece:
+                    self.reset_move()
+
+                    return
 
         if total_clicks == 2:
             selected = self.move_logger[0]
