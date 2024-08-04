@@ -1,6 +1,7 @@
 import pygame as pg
 import numpy as np
-from engine.chess import Game, Move
+# from engine.chess import Game, Move
+from engine.dump import Game, Move
 
 from src.config import *
 
@@ -15,18 +16,20 @@ def _load_pieces():
               'wR', 'wN', 'wB', 'wK', 'wQ', 'wB', 'wN', 'wR', 'wp']
 
     for piece in pieces:
-        IMAGES[piece] = pg.transform.scale(pg.image.load("../images/" + piece + ".png"),
-                                           size=(PIECE_SIZE, PIECE_SIZE))
+        image = pg.image.load("../images/" + piece + ".png")
+        IMAGES[piece] = pg.transform.smoothscale(image, size=(PIECE_SIZE, PIECE_SIZE))
 
 
 def _graphics(screen, game):
     """
     Responsible for generating and updating GUI graphics
-    for each game state.
+    for each chessboard game state.
     """
 
     board = game.board
-    colors = np.array([pg.Color("#F7FCFC"), pg.Color("#C7D4D4")]) # Light gray, gray
+
+    white, purple = '#f1f1f1', '#8475b9'
+    colors = np.array([pg.Color(white), pg.Color(purple)])
 
     # Checker pattern on the board
     for row in range(BOARD_SIZE):
@@ -35,14 +38,21 @@ def _graphics(screen, game):
                 color = colors[0]
             else:
                 color = colors[1]
-            pg.draw.rect(screen, color, pg.Rect(col*PIECE_SIZE, row*PIECE_SIZE, PIECE_SIZE, PIECE_SIZE))
+            pg.draw.rect(screen, color, pg.Rect(col*TILE_SIZE, row*TILE_SIZE,
+                                                TILE_SIZE, TILE_SIZE))
 
     # Place pieces on the board
     for row in range(BOARD_SIZE):
         for col in range(BOARD_SIZE):
-            piece = board[row, col]
+            piece = board[row][col]
             if piece != EMPTY:
-                screen.blit(IMAGES[piece], pg.Rect(col*PIECE_SIZE, row*PIECE_SIZE, PIECE_SIZE, PIECE_SIZE))
+                piece_image = IMAGES[piece]
+                piece_rect = piece_image.get_rect()
+
+                offset = 5
+                piece_rect.center = (col * TILE_SIZE + TILE_SIZE // 2,
+                                     row * TILE_SIZE + TILE_SIZE // 2 + offset)
+                screen.blit(piece_image, piece_rect.topleft)
 
 
 class Chess:
@@ -59,8 +69,8 @@ class Chess:
         self.game = Game()
         _load_pieces()
 
-        self.clicked_piece = ()  # No piece is selected
-        self.click_logger = []  # Keeps track of player clicks
+        self.piece_logger = [] # Keeps track of pieces
+        self.move_logger = []  # Keeps track of (row, col) tuples
 
         self.running = True
 
@@ -72,8 +82,8 @@ class Chess:
         or a valid move is completed.
         """
 
-        self.clicked_piece = ()
-        self.click_logger = []
+        self.move_logger = []
+        self.piece_logger = []
 
 
     def move_handler(self, row, col):
@@ -89,8 +99,23 @@ class Chess:
         out of bounds), validates the move, and updates the game state accordingly.
         """
 
-        # Player clicked the same piece twice
-        if self.clicked_piece == (row, col):
+        self.move_logger.append((row, col))
+        total_clicks = len(self.move_logger)
+
+        piece = self.game.board[row][col]
+        self.piece_logger.append(piece)
+
+        # Player's first move is an empty piece
+        if piece == EMPTY and total_clicks == 1:
+            self.reset_move()
+            
+            return
+
+        white_to_move = self.game.white_to_move
+        is_white = True if self.piece_logger[0][0] == 'w' else False
+
+        print(white_to_move, piece[0])
+        if white_to_move and not is_white and total_clicks == 1:
             self.reset_move()
 
             return
@@ -103,24 +128,11 @@ class Chess:
 
             return
 
-        self.clicked_piece = (row, col)
-        self.click_logger.append(self.clicked_piece)
-
-        total_clicks = len(self.click_logger)
-        chess_piece = self.game.board[row, col]
-
-        # If 1st click and empty square is selected, restart
-        if total_clicks == 1 and chess_piece == EMPTY:
-            self.reset_move()
-
         if total_clicks == 2:
-            move = Move(self.game.board, self.click_logger[0], self.click_logger[1])
-            is_valid = self.game.isValid(move)
+            selected = self.move_logger[0]
+            target = self.move_logger[1]
 
-            # Check if the move is valid before playing it
-            if is_valid:
-                self.game.makeMove(move)
-
+            self.game.perform_move(selected, target)
             self.reset_move()
 
 
@@ -132,15 +144,15 @@ class Chess:
                 if event.type == pg.QUIT:
                     self.running = False
                 elif event.type == pg.MOUSEBUTTONDOWN:
-                    pos = pg.mouse.get_pos()  # Location of mouse on the chess board
+                    pos = pg.mouse.get_pos() # Location of mouse on the chess board
 
-                    col = pos[0] // PIECE_SIZE
-                    row = pos[1] // PIECE_SIZE
+                    col = pos[0] // TILE_SIZE
+                    row = pos[1] // TILE_SIZE
 
                     self.move_handler(row, col)
 
             _graphics(self.screen, self.game)
-            self.clock.tick(MAX_FPS)  # Control the frame rate
+            self.clock.tick(MAX_FPS) # Control the frame rate
             pg.display.flip()  # Update the display
 
         pg.quit()

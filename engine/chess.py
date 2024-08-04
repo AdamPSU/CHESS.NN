@@ -1,8 +1,7 @@
-import numpy as np 
+import numpy as np
+from src.config import EMPTY
 
-class Game:
-    def __init__(self):
-        self.board = np.array(
+CHESS_BOARD = np.array(
             [['bR', 'bN', 'bB', 'bQ', 'bK', 'bB', 'bN', 'bR'],
              ['bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp'],
              ['--', '--', '--', '--', '--', '--', '--', '--'],
@@ -13,37 +12,41 @@ class Game:
              ['wR', 'wN', 'wB', 'wQ', 'wK', 'wB', 'wN', 'wR']]
         )
 
-        self.whiteToMove = True
-        self.moveLog = [] # For debugging
+class Game:
+    def __init__(self):
+        self.board = CHESS_BOARD
+
+        self.white_to_move = True
+        self.move_log = [] # For debugging
 
 
-    def getBoard(self):
+    def get_board(self):
         return self.board
 
 
-    def getPiece(self, move):
-        board = self.getBoard()
-        return board[move.startRow, move.startCol]
+    def get_piece(self, move):
+        board = self.get_board()
+        return board[move.start_row, move.start_col]
 
 
-    def getAttackedPiece(self, move):
-        board = self.getBoard()
-        return board[move.endRow, move.endCol]
+    def get_attacked_piece(self, move):
+        board = self.get_board()
+        return board[move.end_row, move.end_col]
 
 
-    def isValid(self, move): 
+    def is_valid_move(self, move): 
         """Logic for determining whether a move is valid/invalid."""
         
-        piece = self.getPiece(move)
+        piece = self.get_piece(move)
 
         # Determins who will play
-        if (self.whiteToMove) and (piece.startswith('b')):
+        if self.white_to_move and (piece.startswith('b')):
             return False # Not black's turn to play
-        elif (not self.whiteToMove) and (piece.startswith('w')):
+        elif (not self.white_to_move) and (piece.startswith('w')):
             return False # Not white's turn to play
         
-        pieceType = self.getPiece(move)[1] # Get the symbol of the piece
-        pieceHandlers = {
+        piece_type = piece[1] # Get the symbol of the piece
+        piece_mapping = {
         'p': self.pawn,
         'R': self.rook,
         'N': self.knight, 
@@ -52,25 +55,26 @@ class Game:
         'Q': self.queen
         }
 
-        handler = pieceHandlers.get(pieceType)
+        handler = piece_mapping.get(piece_type)
 
-        if (handler):
+        if handler:
             return handler(move) 
         return False 
 
-    def makeMove(self, move):
-        '''
+    def make_move(self, move):
+        """
         Performs the move, logs it in the terminal, and switches 
         the player's turn after moving.
-        '''
-        board = self.getBoard() 
+        """
+
+        board = self.get_board() 
 
         # Move the piece to the new square
-        board[move.startRow, move.startCol] = "--"
-        board[move.endRow, move.endCol] = move.pieceMoved
+        board[move.start_row, move.start_col] = "--"
+        board[move.end_row, move.end_col] = move.piece_moved
 
-        self.moveLog.append(move)
-        self.whiteToMove = not self.whiteToMove # Switch player turns
+        self.move_log.append(move)
+        self.white_to_move = not self.white_to_move # Switch player turns
 
     def pawn(self, move): 
         '''
@@ -79,38 +83,38 @@ class Game:
         Missing: En Passant
         '''
 
-        board = self.getBoard()
-        changeInCol = abs(move.endCol - move.startCol)
-        changeInRow = abs(move.endRow - move.startRow)
-        direction = 1 if (self.whiteToMove) else -1 # White moves upwards, black moves downwards
+        board = self.get_board()
+        change_in_col = abs(move.end_col - move.start_col)
+        change_in_row = abs(move.end_row - move.start_row)
+        direction = 1 if (self.white_to_move) else -1 # White moves upwards, black moves downwards
 
-        def hasMovedBefore(move):
+        def has_moved_before(move):
             '''
             If a pawn is not in its starting position, 
             the pawn is only allowed to move 1 square at a time.
             '''
             # White starts at row 6, black starts at row 1 (list indices)
-            defaultRow = 6 if (self.whiteToMove) else 1
+            default_row = 6 if (self.white_to_move) else 1
             
-            if (move.startRow != defaultRow):
+            if (move.start_row != default_row):
                 return True 
             return False  
             
-        def cannotAttack(move):
+        def cannot_attack(move):
             '''
             Assuming the pawn is looking at a diagonal, it cannot
             attack if the attacked piece is a friendly/empty square.
             '''
 
-            target = 'b' if (self.whiteToMove) else 'w' # White targets black, black targets white
-            changeInRow = move.endRow - move.startRow
-            attackedPiece = self.getAttackedPiece(move) # Retrieve the attacked square
+            target = 'b' if (self.white_to_move) else 'w' # White targets black, black targets white
+            change_in_row = move.end_row - move.start_row
+            attacked_piece = self.get_attacked_piece(move) # Retrieve the attacked square
 
-            if (changeInRow * changeInCol != -1*direction) or (not attackedPiece.startswith(target)):
+            if (change_in_row * change_in_col != -1*direction) or (not attacked_piece.startswith(target)):
                 return True 
             return False # It can attack
         
-        def hasConflicts(move):
+        def has_conflict(move):
             '''
             Incrementally checks for each step taken whether
             there is a conflicting piece. There will be at most 
@@ -118,163 +122,163 @@ class Game:
             '''
 
             # Check for each step if there's a piece in its way
-            for i in range(1, changeInRow+1):
-                movedRow = move.startRow - (i * direction) 
-                if not (board[movedRow, move.startCol] == '--'):
+            for i in range(1, change_in_row+1):
+                moved_row = move.start_row - (i * direction) 
+                if not (board[moved_row, move.start_col] == '--'):
                     return True # There are conflicts; don't move there
             return False
         
-        if (changeInRow > 2) or (changeInCol > 1):
+        if (change_in_row > 2) or (change_in_col > 1):
             # Pawns can't move more than 2 rows up or more than 1 column sideways
             return False 
-        elif (hasMovedBefore(move)) and (changeInRow > 1):
+        elif (has_moved_before(move)) and (change_in_row > 1):
             return False 
-        elif (cannotAttack(move) and (changeInCol > 0)):
+        elif (cannot_attack(move) and (change_in_col > 0)):
             return False 
-        elif (hasConflicts(move) and (changeInCol == 0)):
+        elif (has_conflict(move) and (change_in_col == 0)):
             return False
         return True # Otherwise, valid move
 
     def rook(self, move):
         '''Defines the rules for a chess rook.'''
 
-        board = self.getBoard()
-        changeInRow = abs(move.endRow - move.startRow)
-        changeInCol = abs(move.endCol - move.startCol)
+        board = self.get_board()
+        change_in_row = abs(move.end_row - move.start_row)
+        change_in_col = abs(move.end_col - move.start_col)
         
-        def hasConflicts(move):
+        def has_conflict(move):
             '''
             Determines whether there is a piece preventing the bishop's move 
             along a diagonal.
             '''
 
-            friendly = 'w' if (self.whiteToMove) else 'b' # Determine the color of the current player's pieces
-            attackedPiece = self.getAttackedPiece(move)
+            friendly = 'w' if (self.white_to_move) else 'b' # Determine the color of the current player's pieces
+            attacked_piece = self.get_attacked_piece(move)
 
-            if (attackedPiece.startswith(friendly)):
+            if (attacked_piece.startswith(friendly)):
                 return True  # Can't capture a friendly piece
             
-            moveDistance = changeInRow + changeInCol # Calculate total squares to check
-            rowStep = 1 if move.endRow > move.startRow else -1
-            colStep = 1 if move.endCol > move.startCol else -1
+            move_distance = change_in_row + change_in_col # Calculate total squares to check
+            rowStep = 1 if move.end_row > move.start_row else -1
+            colStep = 1 if move.end_col > move.start_col else -1
 
-            rowMovement = 1 if changeInRow > 0 else 0 # 0 means row will not be checked
-            colMovement = 1 if changeInCol > 0 else 0 # 0 means column will not be checked
+            rowMovement = 1 if change_in_row > 0 else 0 # 0 means row will not be checked
+            colMovement = 1 if change_in_col > 0 else 0 # 0 means column will not be checked
 
-            for i in range(1, moveDistance):
-                newPosition = (move.startRow + (i * rowStep * rowMovement), 
-                    move.startCol + (i * colStep * colMovement)) 
+            for i in range(1, move_distance):
+                new_pos = (move.start_row + (i * rowStep * rowMovement), 
+                    move.start_col + (i * colStep * colMovement)) 
 
-                if board[newPosition] != '--': # Check if the square is occupied
+                if board[new_pos] != '--': # Check if the square is occupied
                     return True  # Conflicting piece on rook's path
             return False 
             
-        if (changeInCol > 0) and (changeInRow > 0):
+        if (change_in_col > 0) and (change_in_row > 0):
             # Can only move along the rows or columns; no diagonals
             return False
         
-        if (hasConflicts(move)):
+        if (has_conflict(move)):
             return False
         return True 
     
     def knight(self, move):
         '''Defines the rules for a chess knight.'''
         
-        def hasConflicts(move):
+        def has_conflict(move):
             '''
             If the attacked piece is not an enemy piece, 
             there is a piece preventing the knight's move.
             '''
 
-            target = 'b' if (self.whiteToMove) else 'w'
-            attackedPiece = self.getAttackedPiece(move)
+            target = 'b' if (self.white_to_move) else 'w'
+            attacked_piece = self.get_attacked_piece(move)
 
-            if (attackedPiece.startswith(target)) or (attackedPiece == '--'):
+            if (attacked_piece.startswith(target)) or (attacked_piece == '--'):
                 # Knight is not staring at a friendly piece, valid attack
                 return False
             return True # Otherwise, illegal move
         
-        if (hasConflicts(move)):
+        if (has_conflict(move)):
             return False
         
         # All  possible moves relative to the knight
-        potentialKnightPositions = np.array([(2, -1), (2, 1), (-2, -1), (-2, 1),
+        knight_squares = np.array([(2, -1), (2, 1), (-2, -1), (-2, 1),
             (1, -2), (1, 2), (-1, -2), (-1, 2)])
         
         # For each move, determine whether there is a match
-        match = any((move.startRow + dr, move.startCol + dc) == (move.endRow, move.endCol)
-            for dr, dc in potentialKnightPositions)
+        match = any((move.start_row + dr, move.start_col + dc) == (move.end_row, move.end_col)
+            for dr, dc in knight_squares)
 
         return match 
     
     def bishop(self, move):
         '''Defines the rules for a chess bishop.'''
 
-        board = self.getBoard()
-        changeInRow = abs(move.endRow - move.startRow)  
-        changeInCol = abs(move.endCol - move.startCol)
+        board = self.get_board()
+        change_in_row = abs(move.end_row - move.start_row)  
+        change_in_col = abs(move.end_col - move.start_col)
 
-        def hasConflicts(move):
+        def has_conflict(move):
             '''
             Determines whether there is a piece preventing the bishop's move 
             along a diagonal.
             '''
 
-            friendly = 'w' if (self.whiteToMove) else 'b'
-            attackedPiece = self.getAttackedPiece(move)
+            friendly = 'w' if (self.white_to_move) else 'b'
+            attacked_piece = self.get_attacked_piece(move)
 
-            if (attackedPiece.startswith(friendly)):
+            if (attacked_piece.startswith(friendly)):
                 return True  # Can't attack a friendly piece
             
-            amountMoved = changeInRow
-            rowDirection = 1 if (move.endRow > move.startRow) else -1
-            colDirection = 1 if (move.endCol > move.startCol) else -1
+            amount_moved = change_in_row
+            row_direction = 1 if (move.end_row > move.start_row) else -1
+            col_direction = 1 if (move.end_col > move.start_col) else -1
 
-            for i in range(1, amountMoved):
-                newPosition = (move.startRow + (i * rowDirection), 
-                    move.startCol + (i * colDirection))  # Diagonal movement
+            for i in range(1, amount_moved):
+                new_pos = (move.start_row + (i * row_direction), 
+                    move.start_col + (i * col_direction))  # Diagonal movement
 
-                if (board[newPosition] != '--'):
+                if (board[new_pos] != '--'):
                     return True  # Conflicting piece on the diagonal
 
             return False
 
-        if (changeInCol == 0): 
+        if (change_in_col == 0): 
             # This is to prevent division by 0 errors
             return False 
         
-        slope = changeInRow / changeInCol
+        slope = change_in_row / change_in_col
         if (slope != 1.0): 
             return False # Can only move on diagonals
         
-        if (hasConflicts(move)):
+        if (has_conflict(move)):
             return False 
         return True
     
     def king(self, move):
         '''Defines the rules for a chess king.'''
 
-        changeInRow = abs(move.endRow - move.startRow)
-        changeInCol = abs(move.endCol - move.startCol)
+        change_in_row = abs(move.end_row - move.start_row)
+        change_in_col = abs(move.end_col - move.start_col)
 
-        def hasConflicts(move):
+        def has_conflict(move):
             '''
             If the attacked piece is not an enemy piece, 
             there is a piece preventing the king's move.
             '''
 
-            target = 'b' if (self.whiteToMove) else 'w'
-            attackedPiece = self.getAttackedPiece(move)
+            target = 'b' if (self.white_to_move) else 'w'
+            attacked_piece = self.get_attacked_piece(move)
 
-            if (attackedPiece.startswith(target)) or (attackedPiece == '--'):
+            if (attacked_piece.startswith(target)) or (attacked_piece == '--'):
                 return False
             return True 
         
-        if (hasConflicts(move)):
+        if (has_conflict(move)):
             return False
 
         # Can move anywhere with a radius of 1
-        if (changeInRow > 1 or changeInCol > 1):
+        if (change_in_row > 1 or change_in_col > 1):
             return False # Otherwise, keep the board
         return True     
 
@@ -284,117 +288,40 @@ class Game:
         of the fact that a queen is simply a rook and a bishop combined.
         '''
 
-        changeInRow = abs(move.endRow - move.startRow)
-        changeInCol = abs(move.endCol - move.startCol)
+        change_in_row = abs(move.end_row - move.start_row)
+        change_in_col = abs(move.end_col - move.start_col)
 
-        if (changeInRow > 0 and changeInCol > 0):
+        if (change_in_row > 0 and change_in_col > 0):
             # Is likely a bishop move
             return self.bishop(move)
         else: 
             # Is likely a rook move
             return self.rook(move)
-
-
-class MoveGenerator: 
-    def __init__(self, screen, turn, board, piece):
-        self.screen = screen
-        self.whiteToMove = turn
-        self.board = board
-        self.row = piece[0]
-        self.col = piece[1]
-
-    def validPawnMoves(self):
-        board = self.board
-        direction = 1 if (self.whiteToMove) else -1 
-        moves = []
-
-        def hasNotMoved(moves):
-            target = 'b' if (self.whiteToMove) else 'w'
-            forwardMoves = [(0, 1), (0, 2)]
-            diagonalMoves = [(-1, 1), (1, 1)]
-
-            for dr, dc in forwardMoves:
-                newMove = (self.row + dr * direction, self.col + dc * direction)
-                moves.append(newMove)
-            
-            for dr, dc in diagonalMoves:
-                newMove = (self.row + dr * direction, self.col + dc * direction)
-
-                if (board[newMove].startswith(target)):
-                    moves.append(newMove)
-
-        hasNotMoved(moves)
-        return moves
-
-        
-
-
-
-
-            
-        # def cannotAttack(move):
-        #     '''
-        #     Assuming the pawn is looking at a diagonal, it cannot
-        #     attack if the attacked piece is a friendly/empty square.
-        #     '''
-
-        #     target = 'b' if (self.whiteToMove) else 'w' # White targets black, black targets white
-        #     changeInRow = move.endRow - move.startRow
-        #     attackedPiece = self.getAttackedPiece(move) # Retrieve the attacked square
-
-        #     if (changeInRow * changeInCol != -1*direction) or (not attackedPiece.startswith(target)):
-        #         return True 
-        #     return False # It can attack
-        
-        # def hasConflicts(move):
-        #     '''
-        #     Incrementally checks for each step taken whether
-        #     there is a conflicting piece. There will be at most 
-        #     two steps.
-        #     '''
-
-        #     # Check for each step if there's a piece in its way
-        #     for i in range(1, changeInRow+1):
-        #         movedRow = move.startRow - (i * direction) 
-        #         if not (board[movedRow, move.startCol] == '--'):
-        #             return True # There are conflicts; don't move there
-        #     return False
-        
-        # if (changeInRow > 2) or (changeInCol > 1):
-        #     # Pawns can't move more than 2 rows up or more than 1 column sideways
-        #     return False 
-        # elif (hasMovedBefore(move)) and (changeInRow > 1):
-        #     return False 
-        # elif (cannotAttack(move) and (changeInCol > 0)):
-        #     return False 
-        # elif (hasConflicts(move) and (changeInCol == 0)):
-        #     return False
-        # return True # Otherwise, valid move
-
         
         
 class Move:
-    ranksToRows = {"1": 7, "2": 6, "3": 5, "4": 4, "5": 3, "6": 2, "7": 1, "8": 0}
-    rowsToRanks = {values: key for key, values in ranksToRows.items()} # Reverses ranksToRows
+    ranks_to_rows = {"1": 7, "2": 6, "3": 5, "4": 4, "5": 3, "6": 2, "7": 1, "8": 0}
+    rows_to_ranks = {values: key for key, values in ranks_to_rows.items()} # Reverses ranks_to_rows
 
-    filesToCols = {"a": 0, "b": 1, "c":2, "d": 3, "e": 4, "f": 5, "g": 6, "h": 7}
-    colsToFiles = {values: key for key, values in filesToCols.items()} # Reverses filesToCols
+    files_to_cols = {"a": 0, "b": 1, "c":2, "d": 3, "e": 4, "f": 5, "g": 6, "h": 7}
+    cols_to_files = {values: key for key, values in files_to_cols.items()} # Reverses files_to_cols
 
-    def __init__(self, board, startSquare, endSquare=None):
-        self.startRow = startSquare[0]
-        self.startCol = startSquare[1]
+    def __init__(self, board, start, end=None):
+        self.start_row, self.start_col = start
 
-        self.pieceMoved = board[self.startRow, self.startCol]
+        self.piece = board[self.start_row, self.start_col]
 
-        if endSquare is not None:
-            self.endRow = endSquare[0]
-            self.endCol = endSquare[1]
+        if end:
+            self.end_row, self.end_col = end
 
-            self.pieceCaptured = board[self.endRow, self.endCol]
+            self.piece_captured = board[self.end_row, self.end_col]
+
     
-    def getChessNotation(self):
-        return self.getRankFile(self.startRow, self.startCol) + self.getRankFile(self.endRow, self.endCol)
+    def get_chess_notation(self):
+        return (self.get_rank_file(self.start_row, self.start_col) + 
+                self.get_rank_file(self.end_row, self.end_col))
 
-    def getRankFile(self, row, col):
-        return self.colsToFiles[col] + self.rowsToRanks[row]
+
+    def get_rank_file(self, row, col):
+        return self.cols_to_files[col] + self.rows_to_ranks[row]
 
