@@ -1,7 +1,7 @@
 import pygame as pg
 import numpy as np
-# from engine.chess import Game, Move
-from engine.dump import Game, Move
+
+from engine.chess import Game, Move
 
 from src.config import *
 
@@ -67,23 +67,10 @@ class Chess:
         self.clock = pg.time.Clock()
 
         self.game = Game()
+        self.move = Move(board=self.game.board, white_to_move=True)
         _load_pieces()
 
-        self.piece_logger = [] # Keeps track of pieces
-        self.move_logger = []  # Keeps track of (row, col) tuples
-
         self.running = True
-
-
-    def reset_move(self):
-        """
-        Resets the selected piece and player clicks. This method is called
-        to clear the selection state, either when an invalid move is detected
-        or a valid move is completed.
-        """
-
-        self.move_logger = []
-        self.piece_logger = []
 
 
     def move_handler(self, row, col):
@@ -99,46 +86,17 @@ class Chess:
         out of bounds), validates the move, and updates the game state accordingly.
         """
 
+        self.move.update(row, col)
+        is_valid_move = self.move.validate()
 
-        self.move_logger.append((row, col))
-        total_clicks = len(self.move_logger)
-
-        piece = self.game.board[row][col]
-        self.piece_logger.append(piece)
-
-        # Player clicked out of bounds
-        if col > BOUNDS or row > BOUNDS:
-            self.reset_move()
-
+        if not is_valid_move:
             return
 
-        if total_clicks == 1:
-            # Player's first move is an empty piece
-            if piece == EMPTY:
-                self.reset_move()
+        start_pos = self.move.move_logger[0]
+        end_pos = self.move.move_logger[1]
 
-                return
-
-            white_to_move = self.game.white_to_move
-            is_white_piece = True if self.piece_logger[0][0] == 'w' else False
-
-            if white_to_move:
-                if not is_white_piece:
-                    self.reset_move()
-
-                    return
-            else:
-                if is_white_piece:
-                    self.reset_move()
-
-                    return
-
-        if total_clicks == 2:
-            selected = self.move_logger[0]
-            target = self.move_logger[1]
-
-            self.game.perform_move(selected, target)
-            self.reset_move()
+        self.game.perform_move(start_pos, end_pos)
+        self.move.reset()
 
 
     def run(self):
@@ -164,5 +122,5 @@ class Chess:
 
 
 if __name__ == '__main__':
-    chess = Chess()
-    chess.run()
+    main = Chess()
+    main.run()

@@ -94,6 +94,8 @@ class Pawn(Piece):
         row_length = abs(end_row - start_row)
 
         total_allowed_steps = 2 if start_row == pawn_starting_row else 1
+        print(pawn_starting_row, total_allowed_steps)
+
 
         if on_same_col and row_length <= total_allowed_steps:
             return True
