@@ -1,9 +1,13 @@
 from abc import ABC, abstractmethod
-
+from src.config import EMPTY
 
 class Piece(ABC):
+    def __init__(self, piece_color=None):
+        self.piece_color = piece_color
+
+
     @abstractmethod
-    def validate(self, start_row, start_col, end_row, end_col, white_to_move=None):
+    def validate(self, piece_logger, start_row, start_col, end_row, end_col):
         """
         Checks whether a chess piece is valid.
 
@@ -20,9 +24,9 @@ class Piece(ABC):
 
 
 class King(Piece):
-    def validate(self, start_row, start_col, end_row, end_col, white_to_move=None):
+    def validate(self, piece_logger, start_row, start_col, end_row, end_col):
         row_length = abs(end_row - start_row)
-        col_length = abs(end_row - start_row)
+        col_length = abs(end_col - start_col)
 
         if row_length <= 1 & col_length <= 1:
             return True
@@ -31,7 +35,7 @@ class King(Piece):
 
 
 class Bishop(Piece):
-    def validate(self, start_row, start_col, end_row, end_col, white_to_move=None):
+    def validate(self, piece_logger, start_row, start_col, end_row, end_col):
         row_length = abs(end_row - start_row)
         col_length = abs(end_col - start_col)
 
@@ -42,7 +46,7 @@ class Bishop(Piece):
 
 
 class Rook(Piece):
-    def validate(self, start_row, start_col, end_row, end_col, white_to_move=None):
+    def validate(self, piece_logger, start_row, start_col, end_row, end_col):
         on_same_row = start_row == end_row
         on_same_col = start_col == end_col
 
@@ -53,7 +57,7 @@ class Rook(Piece):
 
 
 class Queen(Piece):
-    def validate(self, start_row, start_col, end_row, end_col, white_to_move=None):
+    def validate(self, piece_logger, start_row, start_col, end_row, end_col):
         # Check if the move is valid as a bishop move
         row_length = abs(end_row - start_row)
         col_length = abs(end_col - start_col)
@@ -72,7 +76,7 @@ class Queen(Piece):
 
 
 class Knight(Piece):
-    def validate(self, start_row, start_col, end_row, end_col, white_to_move=None):
+    def validate(self, piece_logger, start_row, start_col, end_row, end_col):
         row_length = abs(end_row - start_row)
         col_length = abs(end_col - start_col)
 
@@ -82,22 +86,44 @@ class Knight(Piece):
         if row_length == 1 and col_length == 2:
             return True
 
-        print(1)
         return False
 
 
 class Pawn(Piece):
-    def validate(self, start_row, start_col, end_row, end_col, white_to_move=None):
-        pawn_starting_row = 6 if white_to_move else 1
+    def __init__(self, piece_color):
+        super().__init__(piece_color)
 
-        on_same_col = start_col == end_col
+        self.is_white_pawn = True if self.piece_color == 'w' else False
+        self.direction = -1 if self.is_white_pawn else 1
+
+    def _is_valid_attack(self, piece_logger, start_row, start_col, end_row, end_col):
         row_length = abs(end_row - start_row)
+        col_length = abs(end_col - start_col)
+        change_in_row = end_row - start_row
 
+        is_attacking_diagonal = row_length == col_length == 1
+        is_correct_direction = change_in_row == self.direction
+        is_attacking_piece = piece_logger[1] != EMPTY
+
+
+        if is_attacking_diagonal and is_correct_direction and is_attacking_piece:
+            return True
+
+        return False
+
+
+    def validate(self, piece_logger, start_row, start_col, end_row, end_col):
+        valid_attack = self._is_valid_attack(piece_logger, start_row, start_col, end_row, end_col)
+
+        if valid_attack:
+            return True
+
+        pawn_starting_row = 6 if self.is_white_pawn else 1
+        on_same_col = start_col == end_col
+        steps_taken = abs(end_row - start_row)
         total_allowed_steps = 2 if start_row == pawn_starting_row else 1
-        print(pawn_starting_row, total_allowed_steps)
 
-
-        if on_same_col and row_length <= total_allowed_steps:
+        if on_same_col and steps_taken <= total_allowed_steps:
             return True
 
         return False

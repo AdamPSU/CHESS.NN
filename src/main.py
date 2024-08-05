@@ -89,11 +89,12 @@ class Chess:
         self.move.update(row, col)
         is_valid_move = self.move.validate()
 
-        if not is_valid_move:
-            return
+        if not is_valid_move: return
 
         start_pos = self.move.move_logger[0]
         end_pos = self.move.move_logger[1]
+
+        self.move.log_move()
 
         self.game.perform_move(start_pos, end_pos)
         self.move.reset()

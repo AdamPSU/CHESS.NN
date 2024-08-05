@@ -19,15 +19,6 @@ CHESS_BOARD =[['bR', 'bN', 'bB', 'bQ', 'bK', 'bB', 'bN', 'bR'],
               ['wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp'],
               ['wR', 'wN', 'wB', 'wQ', 'wK', 'wB', 'wN', 'wR']]
 
-PIECE_MAP = {
-    'p': Pawn(),
-    'N': Knight(),
-    'B': Bishop(),
-    'R': Rook(),
-    'K': King(),
-    'Q': Queen(),
-}
-
 
 class Move:
     def __init__(self, board, white_to_move):
@@ -52,6 +43,29 @@ class Move:
     def log_move(self):
         print(f"move log: {self.move_logger}, total clicks: {self.total_clicks}")
 
+    def log_turn(self):
+        if self.white_to_move:
+            print("turn: white")
+
+        print("turn: black")
+
+
+    def start_piece(self, piece):
+        color = 'w' if self.white_to_move else 'b'
+
+        piece_map = {
+            'p': Pawn(color),
+            'N': Knight(),
+            'B': Bishop(),
+            'R': Rook(),
+            'K': King(color),
+            'Q': Queen(),
+        }
+
+        piece_type = piece_map.get(piece)
+
+        return piece_type
+
 
     def update(self, row, col):
         self.move_logger.append((row, col))
@@ -75,13 +89,25 @@ class Move:
         self.total_clicks = 0
 
 
+    def reset_last(self):
+        """
+        Resets the last selected piece and decrements total counts by 1.
+        This method is called to clear the selection state when the second
+        piece is invalid.
+        """
+
+        self.move_logger = self.move_logger[:-1]
+        self.piece_logger = self.piece_logger[:-1]
+
+        self.total_clicks -= 1
+
 
     def _is_path_clear(self, start_row, start_col, end_row, end_col):
-        pawn = self.piece_logger[0][1] == 'p'
+        # pawn = self.piece_logger[0][1] == 'p'
         knight = self.piece_logger[0][1] == 'N'
 
         # Pawns and Knights don't need this validation
-        if pawn or knight:
+        if knight:
             return True
 
         change_in_row = end_row - start_row
@@ -113,7 +139,8 @@ class Move:
         Returns:
         bool: True if the move is valid, False otherwise.
         """
-        self.log_move()
+
+        # TODO: pieces cannot attack friendly squares
 
         row, col = self.move_logger[-1]
         # Player clicked out of bounds
@@ -122,51 +149,58 @@ class Move:
 
             return False
 
-        if self.total_clicks == 1:
-            piece = self.piece_logger[0]
+        piece = self.piece_logger[0]
+        piece_color = piece[0]
+        is_white_piece = True if piece_color == 'w' else False
 
+        if self.total_clicks == 1:
             # First move cannot be an empty piece
             if piece == EMPTY:
                 self.reset()
 
-            piece_color = piece[0]
-            is_white_piece = True if piece_color == 'w' else False
-
+            # Turn validation
             if self.white_to_move and not is_white_piece:
                 self.reset()
             elif not self.white_to_move and is_white_piece:
                 self.reset()
 
             return False
-        else:
-            selected_piece = self.piece_logger[0]
-            target_piece = self.piece_logger[1]
 
-            # User clicked the same piece twice
-            if selected_piece == target_piece:
-                self.reset()
+        selected_piece = self.piece_logger[0]
+        target_piece = self.piece_logger[1]
 
-                return False
+        # User clicked the same piece twice
+        if selected_piece == target_piece:
+            self.reset()
 
-            piece_type = PIECE_MAP.get(selected_piece[1])
+            return False
 
-            start_row, start_col = self.move_logger[0]
-            end_row, end_col = self.move_logger[1]
+        target_piece_color = target_piece[0]
 
-            is_valid_piece = piece_type.validate(start_row, start_col, end_row, end_col,
-                                                 self.white_to_move)
+        if piece_color == target_piece_color:
+            self.reset_last()
 
-            if not is_valid_piece:
-                self.reset()
+            return False
 
-                return False
+        piece_type = self.start_piece(selected_piece[1])
 
-            is_path_clear = self._is_path_clear(start_row, start_col, end_row, end_col)
+        start_row, start_col = self.move_logger[0]
+        end_row, end_col = self.move_logger[1]
 
-            if not is_path_clear:
-                self.reset()
+        is_valid_piece = piece_type.validate(self.piece_logger, start_row, start_col,
+                                             end_row, end_col)
 
-                return False
+        if not is_valid_piece:
+            self.reset_last()
+
+            return False
+
+        is_path_clear = self._is_path_clear(start_row, start_col, end_row, end_col)
+
+        if not is_path_clear:
+            self.reset_last()
+
+            return False
 
         self.white_to_move = not self.white_to_move
 
