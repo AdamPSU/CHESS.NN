@@ -129,6 +129,14 @@ class Move:
             if piece == EMPTY:
                 self.reset()
 
+            piece_color = piece[0]
+            is_white_piece = True if piece_color == 'w' else False
+
+            if self.white_to_move and not is_white_piece:
+                self.reset()
+            elif not self.white_to_move and is_white_piece:
+                self.reset()
+
             return False
         else:
             selected_piece = self.piece_logger[0]
