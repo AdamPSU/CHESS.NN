@@ -9,9 +9,10 @@ class Piece(ABC):
     @abstractmethod
     def validate(self, piece_logger, start_row, start_col, end_row, end_col):
         """
-        Checks whether a chess piece is valid.
+        Checks whether a chess piece has made a valid move.
 
         Parameters:
+        piece_logger (list): List of tuples indicating the start and ending pieces.
         start_row (int): The starting row index.
         start_col (int): The starting column index.
         end_row (int): The ending row index.
@@ -20,7 +21,6 @@ class Piece(ABC):
         Returns:
         bool: True if the move is valid, False otherwise.
         """
-
 
 
 class King(Piece):
@@ -104,7 +104,6 @@ class Pawn(Piece):
         is_attacking_diagonal = row_length == col_length == 1
         is_correct_direction = change_in_row == self.direction
         is_attacking_piece = piece_logger[1] != EMPTY
-
 
         if is_attacking_diagonal and is_correct_direction and is_attacking_piece:
             return True
