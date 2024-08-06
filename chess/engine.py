@@ -1,4 +1,4 @@
-from engine.pieces import (
+from chess.pieces import (
     Pawn,
     Knight,
     Bishop,
