@@ -8,6 +8,5 @@ PIECE_SIZE = TILE_SIZE * 0.9
 BOUNDS = BOARD_SIZE - 1
 
 MAX_FPS = 60
-IMAGES = {}
 
 EMPTY = '--' # Empty piece
