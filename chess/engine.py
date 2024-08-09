@@ -207,9 +207,21 @@ class Move:
         return True
 
 
-class Game:
+class Engine:
     def __init__(self):
         self.board = CHESS_BOARD
+
+
+    def piece(self, location):
+        if None in location:
+            return None
+
+        row = location[0]
+        col = location[1]
+
+        piece = self.board[row][col]
+
+        return piece
 
 
     def perform_move(self, start_pos, end_pos):
