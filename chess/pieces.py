@@ -2,17 +2,13 @@ from abc import ABC, abstractmethod
 from src.config import EMPTY
 
 class Piece(ABC):
-    def __init__(self, piece_color=None):
-        self.piece_color = piece_color
-
-
     @abstractmethod
-    def validate(self, piece_logger, start_row, start_col, end_row, end_col):
+    def validate(self, move, color, start, end):
         """
         Checks whether a chess piece has made a valid move.
 
         Parameters:
-        piece_logger (list): List of tuples indicating the start and ending pieces.
+        move (list): List of tuples indicating the start and ending pieces.
         start_row (int): The starting row index.
         start_col (int): The starting column index.
         end_row (int): The ending row index.
@@ -24,7 +20,10 @@ class Piece(ABC):
 
 
 class King(Piece):
-    def validate(self, piece_logger, start_row, start_col, end_row, end_col):
+    def validate(self, move, color, start, end):
+        start_row, start_col = start
+        end_row, end_col = end
+
         row_length = abs(end_row - start_row)
         col_length = abs(end_col - start_col)
 
@@ -35,7 +34,10 @@ class King(Piece):
 
 
 class Bishop(Piece):
-    def validate(self, piece_logger, start_row, start_col, end_row, end_col):
+    def validate(self, move, color, start, end):
+        start_row, start_col = start
+        end_row, end_col = end
+
         row_length = abs(end_row - start_row)
         col_length = abs(end_col - start_col)
 
@@ -46,7 +48,10 @@ class Bishop(Piece):
 
 
 class Rook(Piece):
-    def validate(self, piece_logger, start_row, start_col, end_row, end_col):
+    def validate(self, move, color, start, end):
+        start_row, start_col = start
+        end_row, end_col = end
+
         on_same_row = start_row == end_row
         on_same_col = start_col == end_col
 
@@ -57,7 +62,10 @@ class Rook(Piece):
 
 
 class Queen(Piece):
-    def validate(self, piece_logger, start_row, start_col, end_row, end_col):
+    def validate(self, move, color, start, end):
+        start_row, start_col = start
+        end_row, end_col = end
+
         # Check if the move is valid as a bishop move
         row_length = abs(end_row - start_row)
         col_length = abs(end_col - start_col)
@@ -76,7 +84,10 @@ class Queen(Piece):
 
 
 class Knight(Piece):
-    def validate(self, piece_logger, start_row, start_col, end_row, end_col):
+    def validate(self, move, color, start, end):
+        start_row, start_col = start
+        end_row, end_col = end
+
         row_length = abs(end_row - start_row)
         col_length = abs(end_col - start_col)
 
@@ -90,20 +101,16 @@ class Knight(Piece):
 
 
 class Pawn(Piece):
-    def __init__(self, piece_color):
-        super().__init__(piece_color)
-
-        self.is_white_pawn = True if self.piece_color == 'w' else False
-        self.direction = -1 if self.is_white_pawn else 1
-
-    def _is_valid_attack(self, piece_logger, start_row, start_col, end_row, end_col):
+    def _is_valid_attack(self, move, color, start_row, start_col, end_row, end_col):
         row_length = abs(end_row - start_row)
         col_length = abs(end_col - start_col)
         change_in_row = end_row - start_row
 
+        direction = -1 if color == 'w' else 1
+
         is_attacking_diagonal = row_length == col_length == 1
-        is_correct_direction = change_in_row == self.direction
-        is_attacking_piece = piece_logger[1] != EMPTY
+        is_correct_direction = change_in_row == direction
+        is_attacking_piece = move[1] != EMPTY
 
         if is_attacking_diagonal and is_correct_direction and is_attacking_piece:
             return True
@@ -111,13 +118,16 @@ class Pawn(Piece):
         return False
 
 
-    def validate(self, piece_logger, start_row, start_col, end_row, end_col):
-        valid_attack = self._is_valid_attack(piece_logger, start_row, start_col, end_row, end_col)
+    def validate(self, move, color, start, end):
+        start_row, start_col = start
+        end_row, end_col = end
+
+        valid_attack = self._is_valid_attack(move, color, start_row, start_col, end_row, end_col)
 
         if valid_attack:
             return True
 
-        pawn_starting_row = 6 if self.is_white_pawn else 1
+        pawn_starting_row = 6 if color == 'w' else 1
         on_same_col = start_col == end_col
         steps_taken = abs(end_row - start_row)
         total_allowed_steps = 2 if start_row == pawn_starting_row else 1

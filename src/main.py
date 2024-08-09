@@ -5,6 +5,13 @@ from chess.engine import Engine, Move
 
 from src.config import *
 
+
+def _draw_rect(row, col):
+    rect = pg.Rect(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+
+    return rect
+
+
 def _load_pieces():
     """
     Load chess pieces. This will only be done once, at the start of the
@@ -38,7 +45,7 @@ def _load_grid(screen):
             else:
                 color = colors[1]
 
-            rect = pg.Rect(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+            rect = _draw_rect(row, col)
             pg.draw.rect(screen, color, rect)
 
 
@@ -61,6 +68,7 @@ def _update_pieces(screen, board):
             offset = 5
             piece_rect.center = (col * TILE_SIZE + TILE_SIZE // 2,
                                  row * TILE_SIZE + TILE_SIZE // 2 + offset)
+
             screen.blit(piece_image, piece_rect.topleft)
 
 
@@ -100,11 +108,15 @@ class Chess:
         self.clock = pg.time.Clock()
 
         self.engine = Engine()
-        self.move = Move(board=self.engine.board, white_to_move=True)
+        self.white_to_move = True
 
         self.highlighted = set()
-        self.selected = None
-        self.drop_position = None
+
+        self.start_piece = None
+
+        # (row, col)
+        self.start_loc = None
+        self.target_loc = None
 
         _load_pieces()
         _load_grid(self.screen)
@@ -112,15 +124,25 @@ class Chess:
         self.running = True
 
 
-    def highlight_handler(self, tile):
-        # Highlighted piece has been highlighted twice, un-highlight
-        if tile in self.highlighted:
-            self.highlighted.discard(tile)
-        else:
-            self.highlighted.add(tile)
+    def highlight_handler(self, event, row, col):
+        left_click = event.button == 1
+        right_click = event.button == 3
+
+        if left_click:
+            # Un-highlight all highlighted pieces
+            self.highlighted.clear()
+
+        elif right_click:
+            square = (row, col)
+
+            if square in self.highlighted:
+                # Highlighted piece has been highlighted twice, un-highlight
+                self.highlighted.discard(square)  
+            else:
+                self.highlighted.add(square)
 
 
-    def move_handler(self, row, col):
+    def move_handler(self, start, end):
         """
         Handles player clicks on the chessboard.
 
@@ -134,32 +156,16 @@ class Chess:
         """
 
 
-        self.move.update(row, col)
-        is_valid_move = self.move.validate()
+        move = Move(self.engine.board, self.white_to_move, start, end)
+        is_valid_move = move.validate()
 
         if not is_valid_move: return
 
-        start_pos = self.move.move_logger[0]
-        end_pos = self.move.move_logger[1]
+        self.white_to_move = not self.white_to_move
 
         # self.move.log_move()
 
-        self.engine.perform_move(start_pos, end_pos)
-        self.move.reset()
-
-
-    def click_handler(self, event, row, col):
-        left_click = event.button == 1
-        right_click = event.button == 3
-
-        if left_click:
-            # Un-highlight all highlighted pieces
-            self.highlighted.clear()
-
-            self.move_handler(row, col)
-        elif right_click:  # Right mouse click
-            tile = (row, col)
-            self.highlight_handler(tile)
+        self.engine.perform_move(start, end)
 
 
     def get_square_under_mouse(self):
@@ -170,9 +176,9 @@ class Chess:
 
         try:
             if row >= 0 and col >= 0:
-                location = (row, col)
+                loc = (row, col)
 
-                return self.engine.piece(location), row, col
+                return self.engine.piece(loc), row, col
 
         except IndexError:
             pass
@@ -180,18 +186,17 @@ class Chess:
         return None, None, None
 
 
-    def draw_drag(self, selected):
-        if not selected:
+    def draw_drag(self, piece, piece_idx):
+        if not piece_idx:
             return
-
-        piece, row, col = selected
 
         if piece == EMPTY:
             return
 
-        if col is not None:
-            rect = col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE
-            pg.draw.rect(self.screen, '#cda7e7', rect, 5)
+        row, col = piece_idx
+
+        rect = _draw_rect(row, col)
+        pg.draw.rect(self.screen, '#cda7e7', rect, 5)
 
         image = IMAGES[piece]
 
@@ -201,48 +206,42 @@ class Chess:
         self.screen.blit(image, image.get_rect(center = pg.Vector2(pos) + offset))
         self.screen.blit(image, image.get_rect(center = pg.Vector2(pos)))
 
-        new_row = pos[1] // TILE_SIZE
-        new_col = pos[0] // TILE_SIZE
+        end_row = pos[1] // TILE_SIZE
+        end_col = pos[0] // TILE_SIZE
 
-        return new_row, new_col
+        return end_row, end_col
 
 
     def run(self):
         """Run the chess game."""
 
         while self.running:
-            piece, row, col = self.get_square_under_mouse()
+            current_piece, row, col = self.get_square_under_mouse()
 
             for event in pg.event.get():
                 if event.type == pg.QUIT:
                     self.running = False
 
                 if event.type == pg.MOUSEBUTTONDOWN:
-                    if piece is not None:
-                        self.selected = piece, row, col
+                    self.highlight_handler(event, row, col)
+                    left_click = event.button == 1
 
-                    right_click = event.button == 3
+                    if left_click and current_piece is not None:
+                        self.start_piece = current_piece
+                        self.start_loc = (row, col)
 
-                    if right_click:
-                        tile = (row, col)
-                        self.highlight_handler(tile)
                 if event.type == pg.MOUSEBUTTONUP:
-                    if self.drop_position:
-                        piece, old_row, old_col = self.selected
-                        self.engine.board[old_row][old_col] = EMPTY
+                    if self.target_loc:
+                        self.move_handler(self.start_loc, self.target_loc)
 
-                        new_row, new_col = self.drop_position
-
-                        self.engine.board[new_row][new_col] = piece
-
-                    self.selected = None
-                    self.drop_position = None
+                    self.start_loc = None
+                    self.target_loc = None
 
             _graphics(self.screen, self.engine.board, self.highlighted)
-            self.drop_position = self.draw_drag(self.selected)
+            self.target_loc = self.draw_drag(self.start_piece, self.start_loc)
 
-            self.clock.tick(MAX_FPS) # Control the frame rate
-            pg.display.flip()  # Update the display
+            self.clock.tick(MAX_FPS)
+            pg.display.flip()
 
         pg.quit()
 
