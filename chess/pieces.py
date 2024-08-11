@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from src.config import EMPTY
 
+
 class Piece(ABC):
     @abstractmethod
     def validate(self, move, color, start, end):
