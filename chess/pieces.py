@@ -102,6 +102,7 @@ class Knight(Piece):
 
 
 class Pawn(Piece):
+
     def _is_valid_attack(self, move, color, start_row, start_col, end_row, end_col):
         row_length = abs(end_row - start_row)
         col_length = abs(end_col - start_col)
@@ -129,11 +130,15 @@ class Pawn(Piece):
             return True
 
         pawn_starting_row = 6 if color == 'w' else 1
+
         on_same_col = start_col == end_col
-        steps_taken = abs(end_row - start_row)
+        steps_taken = end_row - start_row
         total_allowed_steps = 2 if start_row == pawn_starting_row else 1
 
-        if on_same_col and steps_taken <= total_allowed_steps:
+        if (color == 'w' and steps_taken > 0) or (color == 'b' and steps_taken < 0):
+            return False
+
+        if on_same_col and abs(steps_taken) <= total_allowed_steps:
             return True
 
         return False
