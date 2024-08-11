@@ -1,16 +1,35 @@
 import pygame as pg
-import numpy as np
 
-from chess.engine import Engine, Move
+from chess.engine import Engine, Move, gen_valid_moves
 
-from src.graphics import draw_rect, load_pieces, load_grid, graphics
-load_pieces()
+from src.graphics import draw_rect, load_pieces, load_grid, graphics; load_pieces()
 
 from src.config import *
 from src.graphics import IMAGES
 
 
+def _highlight_valid_moves(screen, valid_moves):
+    for move in valid_moves:
+        row, col = move
+
+        surface = pg.Surface((TILE_SIZE, TILE_SIZE), pg.SRCALPHA)
+
+        center = (TILE_SIZE // 2, TILE_SIZE // 2)
+        radius = TILE_SIZE // 6
+
+        alpha = 120
+        black = (51, 55, 76, alpha)
+
+        # Draw a semi-transparent circle
+        pg.draw.circle(surface, black, center, radius)
+
+        # Blit the surface onto the screen at the correct position
+        screen.blit(surface, (col * TILE_SIZE, row * TILE_SIZE))
+
+
 class Chess:
+    """Chess interface facilitated by Pygame."""
+
     def __init__(self):
         pg.init()
 
@@ -23,68 +42,65 @@ class Chess:
         self.white_to_move = True
 
         self.highlighted = set()
+        self.valid_moves = set()
 
         self.start_piece = None
 
-        # (row, col)
         self.start_loc = None
         self.target_loc = None
 
-        # load_pieces()
         load_grid(self.screen)
 
         self.icon = IMAGES['bK']
         pg.display.set_icon(self.icon)
 
-
         self.running = True
 
 
-    def highlight_handler(self, event, row, col):
-        left_click = event.button == 1
-        right_click = event.button == 3
+    def run(self):
+        """Run the chess game."""
 
-        if left_click:
-            # Un-highlight all highlighted pieces
-            self.highlighted.clear()
+        while self.running:
+            current_piece, row, col = self.get_tile_under_mouse()
 
-        elif right_click:
-            square = (row, col)
+            for event in pg.event.get():
+                if event.type == pg.QUIT:
+                    self.running = False
 
-            if square in self.highlighted:
-                # Highlighted piece has been highlighted twice, un-highlight
-                self.highlighted.discard(square)  
-            else:
-                self.highlighted.add(square)
+                if event.type == pg.MOUSEBUTTONDOWN:
+                    self.highlight_handler(event, row, col)
 
+                    left_click = event.button == 1
+                    if left_click and current_piece is not None:
+                        self.start_piece = current_piece
+                        self.start_loc = (row, col)
 
-    def move_handler(self, start, end):
-        """
-        Handles player clicks on the chessboard.
+                        if current_piece != EMPTY:
+                            self.generate_moves()
 
-        Parameters:
-        row (int): The row index of the clicked square.
-        col (int): The column index of the clicked square.
+                if event.type == pg.MOUSEBUTTONUP:
+                    self.valid_moves.clear()
 
-        This method handles the logic for selecting and moving pieces on the board.
-        It checks for invalid clicks (e.g., clicking the same piece twice or clicking
-        out of bounds), validates the move, and updates the game state accordingly.
-        """
+                    if self.target_loc:
+                        self.move_handler(self.start_loc, self.target_loc)
 
+                    self.start_loc = None
+                    self.target_loc = None
 
-        move = Move(self.engine.board, self.white_to_move, start, end)
-        is_valid_move = move.validate()
+            graphics(self.screen, self.engine.board, self.highlighted)
+            _highlight_valid_moves(self.screen, self.valid_moves)
 
-        if not is_valid_move: return
+            self.target_loc = self.drag(self.start_piece, self.start_loc)
 
-        self.white_to_move = not self.white_to_move
+            self.clock.tick(MAX_FPS)
+            pg.display.flip()
 
-        # self.move.log_move()
-
-        self.engine.perform_move(start, end)
+        pg.quit()
 
 
-    def get_square_under_mouse(self):
+    def get_tile_under_mouse(self):
+        """Obtains the tile belonging to the mouse position."""
+
         x_mouse, y_mouse = pg.mouse.get_pos()
 
         row = y_mouse // TILE_SIZE
@@ -102,14 +118,54 @@ class Chess:
         return None, None, None
 
 
-    def draw_drag(self, piece, piece_idx):
-        if not piece_idx:
+    def highlight_handler(self, event, row, col):
+        """
+        Logic to handle the highlighting of chess tiles.
+
+        - If a tile is left-clicked, all highlighted tiles will be cleared.
+        - If a tile is right-clicked, it will be highlighted.
+        - If a tile is right-clicked twice, it will be cleared.
+        """
+
+        left_click = event.button == 1
+        right_click = event.button == 3
+
+        if left_click:
+            self.highlighted.clear()
+
+        elif right_click:
+            tile = (row, col)
+
+            if tile in self.highlighted:
+                self.highlighted.discard(tile)
+            else:
+                self.highlighted.add(tile)
+
+
+    def generate_moves(self):
+        if len(self.valid_moves) > 0:
+            self.valid_moves.clear()
+
+        for loc, valid_move in gen_valid_moves(self.engine.board, self.white_to_move,
+                                               self.start_piece, self.start_loc):
+            if valid_move:
+                self.valid_moves.add(loc)
+
+
+    def drag(self, piece, loc):
+        """
+        Responsible for dragging the selected piece to the target
+        location. If the piece location is out of bounds or the selected
+        piece is an empty tile, this method will be ignored.
+        """
+
+        if not loc:
             return
 
         if piece == EMPTY:
             return
 
-        row, col = piece_idx
+        row, col = loc
 
         rect = draw_rect(row, col)
         pg.draw.rect(self.screen, '#cda7e7', rect, 5)
@@ -128,38 +184,21 @@ class Chess:
         return end_row, end_col
 
 
-    def run(self):
-        """Run the chess game."""
+    def move_handler(self, start, end):
+        """
+        Handles the logic for selecting and moving pieces on the board.
+        It checks for invalid clicks (e.g., attacking a friendly piece), validates the move,
+        and updates the game state accordingly.
+        """
 
-        while self.running:
-            current_piece, row, col = self.get_square_under_mouse()
+        move = Move(self.engine.board, self.white_to_move, start, end)
+        is_valid_move = move.validate()
 
-            for event in pg.event.get():
-                if event.type == pg.QUIT:
-                    self.running = False
+        if not is_valid_move:
+            return
 
-                if event.type == pg.MOUSEBUTTONDOWN:
-                    self.highlight_handler(event, row, col)
-                    left_click = event.button == 1
-
-                    if left_click and current_piece is not None:
-                        self.start_piece = current_piece
-                        self.start_loc = (row, col)
-
-                if event.type == pg.MOUSEBUTTONUP:
-                    if self.target_loc:
-                        self.move_handler(self.start_loc, self.target_loc)
-
-                    self.start_loc = None
-                    self.target_loc = None
-
-            graphics(self.screen, self.engine.board, self.highlighted)
-            self.target_loc = self.draw_drag(self.start_piece, self.start_loc)
-
-            self.clock.tick(MAX_FPS)
-            pg.display.flip()
-
-        pg.quit()
+        self.white_to_move = not self.white_to_move
+        self.engine.perform_move(start, end)
 
 
 if __name__ == '__main__':

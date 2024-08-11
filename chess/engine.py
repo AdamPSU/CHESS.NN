@@ -31,14 +31,14 @@ def _piece_type(piece):
 
     piece_symbol = piece_map.get(piece[1])
 
-    if type(piece_symbol) is None:
+    if piece_symbol is None:
         raise ValueError(
             f"Piece type is not supported. Please make sure the provided piece "
             f"is correct. Invalid piece: '{piece}'."
         )
 
-
     return piece_symbol
+
 
 def _is_path_clear(board, start_piece, start_piece_idx, target_piece_idx):
     start_piece_type = start_piece[1]
@@ -124,22 +124,20 @@ class Move:
         board (list): The current state of the chess board.
         """
 
-        self.start = start
-        self.end = end
+        self.start_piece_idx = start
+        self.target_piece_idx = end
         self.board = board
         self.white_to_move = white_to_move
 
         self.start_row, self.start_col = start
 
-        start_piece_idx = (self.start_row, self.start_col)
-        self.start_piece = self.piece(start_piece_idx)
+        self.start_piece = self.piece(start)
         self.start_piece_color = self.start_piece[0]
         self.start_piece_type = self.start_piece[1]
 
-        self.end_row, self.end_col = end
+        self.target_row, self.target__col = end
 
-        target_piece_idx = (self.end_row, self.end_col)
-        self.target_piece = self.piece(target_piece_idx)
+        self.target_piece = self.piece(end)
         self.target_piece_color = self.target_piece[0]
         self.target_piece_type = self.target_piece[1]
 
@@ -157,7 +155,7 @@ class Move:
         # Turn validation
         if self.white_to_move and not is_white_piece:
             return False
-
+        
         if not self.white_to_move and is_white_piece:
             return False
 
@@ -169,12 +167,14 @@ class Move:
         piece = _piece_type(self.start_piece)
 
         move = (self.start_piece, self.target_piece)
-        is_valid_piece = piece.validate(move, self.start_piece_color, self.start, self.end)
+        is_valid_piece = piece.validate(move, self.start_piece_color,
+                                        self.start_piece_idx, self.target_piece_idx)
 
         if not is_valid_piece:
             return False
 
-        is_path_clear = self._is_path_clear()
+        is_path_clear = _is_path_clear(self.board, self.start_piece,
+                                       self.start_piece_idx, self.target_piece_idx)
 
         if not is_path_clear:
             return False
@@ -196,33 +196,33 @@ class Move:
         return piece
 
 
-    def _is_path_clear(self):
-        knight = self.start_piece_type == 'N'
-
-        # Knights don't need this validation
-        if knight:
-            return True
-
-        change_in_row = self.end_row - self.start_row
-        change_in_col = self.end_col - self.start_col
-
-        # Normalize steps to be between 1, 0, and -1
-        row_step = change_in_row // max(1, abs(change_in_row))
-        col_step = change_in_col // max(1, abs(change_in_col))
-
-        current_row = self.start_row + row_step
-        current_col = self.start_col + col_step
-
-        while (current_row, current_col) != (self.end_row, self.end_col):
-            current_piece = self.board[current_row][current_col]
-
-            if current_piece != EMPTY:
-                return False
-
-            current_row += row_step
-            current_col += col_step
-
-        return True
+    # def _is_path_clear(self):
+    #     knight = self.start_piece_idx_piece_type == 'N'
+    # 
+    #     # Knights don't need this validation
+    #     if knight:
+    #         return True
+    # 
+    #     change_in_row = self.target_piece_idx_row - self.start_piece_idx_row
+    #     change_in_col = self.target_piece_idx_col - self.start_piece_idx_col
+    # 
+    #     # Normalize steps to be between 1, 0, and -1
+    #     row_step = change_in_row // max(1, abs(change_in_row))
+    #     col_step = change_in_col // max(1, abs(change_in_col))
+    # 
+    #     current_row = self.start_piece_idx_row + row_step
+    #     current_col = self.start_piece_idx_col + col_step
+    # 
+    #     while (current_row, current_col) != (self.target_piece_idx_row, self.target_piece_idx_col):
+    #         current_piece = self.board[current_row][current_col]
+    # 
+    #         if current_piece != EMPTY:
+    #             return False
+    # 
+    #         current_row += row_step
+    #         current_col += col_step
+    # 
+    #     return True
 
 
     def log_turn(self):
