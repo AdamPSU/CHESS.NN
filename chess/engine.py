@@ -184,13 +184,6 @@ class Move:
         return True
 
 
-    def log_turn(self):
-        if self.white_to_move:
-            print("turn: white")
-
-        print("turn: black")
-
-
     def piece(self, loc):
         if None in loc:
             return None
@@ -230,6 +223,13 @@ class Move:
             current_col += col_step
 
         return True
+
+
+    def log_turn(self):
+        if self.white_to_move:
+            print("turn: white")
+
+        print("turn: black")
 
 
 class Engine:
