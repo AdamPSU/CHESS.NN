@@ -19,7 +19,29 @@ CHESS_BOARD =[['bR', 'bN', 'bB', 'bQ', 'bK', 'bB', 'bN', 'bR'],
               ['wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp'],
               ['wR', 'wN', 'wB', 'wQ', 'wK', 'wB', 'wN', 'wR']]
 
+
+def piece_name(board, piece_idx):
+    """
+    Converts a piece index to its corresponding piece name.
+
+    Example:
+        piece((7, 0)) -> 'wR'
+    """
+
+    if None in piece_idx:
+        return None
+
+    row = piece_idx[0]
+    col = piece_idx[1]
+
+    piece = board[row][col]
+
+    return piece
+
+
 def _piece_type(piece):
+    """Maps to each piece the associated piece type code."""
+
     piece_map = {
         'p': Pawn(),
         'N': Knight(),
@@ -41,6 +63,13 @@ def _piece_type(piece):
 
 
 def _is_path_clear(board, start_piece, start_piece_idx, target_piece_idx):
+    """
+    Checks if a piece is standing along the selected piece's
+    trajectory before reaching the target index. For knights,
+    this function is unnecessary, as they can can jump over pieces
+    freely.
+    """
+
     start_piece_type = start_piece[1]
     knight = start_piece_type == 'N'
 
@@ -74,6 +103,15 @@ def _is_path_clear(board, start_piece, start_piece_idx, target_piece_idx):
 
 
 def gen_valid_moves(board, white_to_move, start_piece, start_piece_idx):
+    """
+    Generates the available move space for the selected piece.
+    This works by simulating all possible target locations and
+    exhaustively validating the move until a valid move is reached.
+
+    Yields:
+    bool: True if the move is valid, False otherwise.
+    """
+
     start_piece_color = start_piece[0] # Necessary for pawn moves
     piece = _piece_type(start_piece)
 
@@ -131,13 +169,13 @@ class Move:
 
         self.start_row, self.start_col = start
 
-        self.start_piece = self.piece(start)
+        self.start_piece = piece_name(board, start)
         self.start_piece_color = self.start_piece[0]
         self.start_piece_type = self.start_piece[1]
 
-        self.target_row, self.target__col = end
+        self.target_row, self.target_col = end
 
-        self.target_piece = self.piece(end)
+        self.target_piece = piece_name(board, end)
         self.target_piece_color = self.target_piece[0]
         self.target_piece_type = self.target_piece[1]
 
@@ -184,69 +222,18 @@ class Move:
         return True
 
 
-    def piece(self, loc):
-        if None in loc:
-            return None
-
-        row = loc[0]
-        col = loc[1]
-
-        piece = self.board[row][col]
-
-        return piece
-
-
-    # def _is_path_clear(self):
-    #     knight = self.start_piece_idx_piece_type == 'N'
-    # 
-    #     # Knights don't need this validation
-    #     if knight:
-    #         return True
-    # 
-    #     change_in_row = self.target_piece_idx_row - self.start_piece_idx_row
-    #     change_in_col = self.target_piece_idx_col - self.start_piece_idx_col
-    # 
-    #     # Normalize steps to be between 1, 0, and -1
-    #     row_step = change_in_row // max(1, abs(change_in_row))
-    #     col_step = change_in_col // max(1, abs(change_in_col))
-    # 
-    #     current_row = self.start_piece_idx_row + row_step
-    #     current_col = self.start_piece_idx_col + col_step
-    # 
-    #     while (current_row, current_col) != (self.target_piece_idx_row, self.target_piece_idx_col):
-    #         current_piece = self.board[current_row][current_col]
-    # 
-    #         if current_piece != EMPTY:
-    #             return False
-    # 
-    #         current_row += row_step
-    #         current_col += col_step
-    # 
-    #     return True
-
-
     def log_turn(self):
+        """Prints the turn for troubleshooting purposes."""
+
         if self.white_to_move:
             print("turn: white")
-
-        print("turn: black")
+        else:
+            print("turn: black")
 
 
 class Engine:
     def __init__(self):
         self.board = CHESS_BOARD
-
-
-    def piece(self, location):
-        if None in location:
-            return None
-
-        row = location[0]
-        col = location[1]
-
-        piece = self.board[row][col]
-
-        return piece
 
 
     def perform_move(self, start, end):

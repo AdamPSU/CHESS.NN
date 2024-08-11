@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from src.config import EMPTY
 
+# TODO: En passant with pawns
+# TODO: King checks
 
 class Piece(ABC):
     @abstractmethod
@@ -10,10 +12,9 @@ class Piece(ABC):
 
         Parameters:
         move (list): List of tuples indicating the start and ending pieces.
-        start_row (int): The starting row index.
-        start_col (int): The starting column index.
-        end_row (int): The ending row index.
-        end_col (int): The ending column index.
+        color (bool): The color of the starting piece.
+        start (int): The starting move index.
+        end (int): The ending move index.
 
         Returns:
         bool: True if the move is valid, False otherwise.
@@ -104,6 +105,8 @@ class Knight(Piece):
 class Pawn(Piece):
 
     def _is_valid_attack(self, move, color, start_row, start_col, end_row, end_col):
+        """Checks if pawn is attacking diagonal square."""
+
         row_length = abs(end_row - start_row)
         col_length = abs(end_col - start_col)
         change_in_row = end_row - start_row

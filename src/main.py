@@ -1,6 +1,6 @@
 import pygame as pg
 
-from chess.engine import Engine, Move, gen_valid_moves
+from chess.engine import Engine, Move, gen_valid_moves, piece_name
 
 from src.graphics import draw_rect, load_pieces, load_grid, graphics; load_pieces()
 
@@ -9,21 +9,27 @@ from src.graphics import IMAGES
 
 
 def _highlight_valid_moves(screen, valid_moves):
+    """
+    This function is responsible the visualization
+    of the move space for the clicked piece. If a
+    move is valid, it will be "highlighted," or marked
+    with a black circle.
+    """
+
     for move in valid_moves:
         row, col = move
 
         surface = pg.Surface((TILE_SIZE, TILE_SIZE), pg.SRCALPHA)
 
+        # Circles must be centered within the tile
         center = (TILE_SIZE // 2, TILE_SIZE // 2)
         radius = TILE_SIZE // 6
 
         alpha = 120
         black = (51, 55, 76, alpha)
 
-        # Draw a semi-transparent circle
         pg.draw.circle(surface, black, center, radius)
 
-        # Blit the surface onto the screen at the correct position
         screen.blit(surface, (col * TILE_SIZE, row * TILE_SIZE))
 
 
@@ -41,7 +47,7 @@ class Chess:
         self.engine = Engine()
         self.white_to_move = True
 
-        self.highlighted = set()
+        self.marked_moves = set()
         self.valid_moves = set()
 
         self.start_piece = None
@@ -68,7 +74,7 @@ class Chess:
                     self.running = False
 
                 if event.type == pg.MOUSEBUTTONDOWN:
-                    self.highlight_handler(event, row, col)
+                    self.marked_moves_handler(event, row, col)
 
                     left_click = event.button == 1
                     if left_click and current_piece is not None:
@@ -87,7 +93,7 @@ class Chess:
                     self.start_loc = None
                     self.target_loc = None
 
-            graphics(self.screen, self.engine.board, self.highlighted)
+            graphics(self.screen, self.engine.board, self.marked_moves)
             _highlight_valid_moves(self.screen, self.valid_moves)
 
             self.target_loc = self.drag(self.start_piece, self.start_loc)
@@ -108,9 +114,9 @@ class Chess:
 
         try:
             if row >= 0 and col >= 0:
-                loc = (row, col)
+                piece_idx = (row, col)
 
-                return self.engine.piece(loc), row, col
+                return piece_name(self.engine.board, piece_idx), row, col
 
         except IndexError:
             pass
@@ -118,12 +124,12 @@ class Chess:
         return None, None, None
 
 
-    def highlight_handler(self, event, row, col):
+    def marked_moves_handler(self, event, row, col):
         """
-        Logic to handle the highlighting of chess tiles.
+        Logic to handle the marking/highlighting of chess tiles.
 
-        - If a tile is left-clicked, all highlighted tiles will be cleared.
-        - If a tile is right-clicked, it will be highlighted.
+        - If a tile is left-clicked, all marked tiles will be cleared.
+        - If a tile is right-clicked, it will be marked.
         - If a tile is right-clicked twice, it will be cleared.
         """
 
@@ -131,18 +137,23 @@ class Chess:
         right_click = event.button == 3
 
         if left_click:
-            self.highlighted.clear()
+            self.marked_moves.clear()
 
         elif right_click:
             tile = (row, col)
 
-            if tile in self.highlighted:
-                self.highlighted.discard(tile)
+            if tile in self.marked_moves:
+                self.marked_moves.discard(tile)
             else:
-                self.highlighted.add(tile)
+                self.marked_moves.add(tile)
 
 
     def generate_moves(self):
+        """
+        Find valid moves in the move space and add them
+        to the valid_moves set.
+        """
+
         if len(self.valid_moves) > 0:
             self.valid_moves.clear()
 
@@ -154,7 +165,7 @@ class Chess:
 
     def drag(self, piece, loc):
         """
-        Responsible for dragging the selected piece to the target
+        This function is responsible for dragging the selected piece to the target
         location. If the piece location is out of bounds or the selected
         piece is an empty tile, this method will be ignored.
         """
