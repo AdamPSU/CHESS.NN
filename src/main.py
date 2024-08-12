@@ -1,7 +1,7 @@
 import pygame as pg
 
-from chess.engine import Engine, Move, gen_valid_moves, piece_name
-
+from chess.engine import Engine, Move, gen_valid_moves
+from chess.utils import piece_name
 from src.graphics import draw_rect, load_pieces, load_grid, graphics; load_pieces()
 
 from src.config import *
@@ -157,8 +157,8 @@ class Chess:
         if len(self.valid_moves) > 0:
             self.valid_moves.clear()
 
-        for loc, valid_move in gen_valid_moves(self.engine.board, self.white_to_move,
-                                               self.source_piece, self.source_pos):
+        for loc, valid_move in gen_valid_moves(self.engine.board, self.engine.history,
+                                               self.white_to_move, self.source_piece, self.source_pos):
             if valid_move:
                 self.valid_moves.add(loc)
 
@@ -195,21 +195,27 @@ class Chess:
         return end_row, end_col
 
 
-    def move_handler(self, start, end):
+    def move_handler(self, source, target):
         """
         Handles the logic for selecting and moving pieces on the board.
         It checks for invalid clicks (e.g., attacking a friendly piece), validates the move,
         and updates the game state accordingly.
         """
 
-        move = Move(self.engine.board, self.white_to_move, start, end)
-        is_valid_move = move.validate()
+        move = Move(self.engine.board, self.engine.history, self.white_to_move, source, target)
+        is_valid_move, move_type = move.validate()
 
         if not is_valid_move:
             return
 
         self.white_to_move = not self.white_to_move
-        self.engine.perform_move(start, end)
+
+        if move_type == "en passant":
+            is_en_passant = True
+        else:
+            is_en_passant = False
+
+        self.engine.perform_move(source, target, is_en_passant)
 
 
 if __name__ == '__main__':
