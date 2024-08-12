@@ -2,19 +2,33 @@ from abc import ABC, abstractmethod
 from src.config import EMPTY
 
 # TODO: En passant with pawns
+# TODO: Pawn promotions
 # TODO: King checks
 
 class Piece(ABC):
+    def __init__(self, move, source_piece, target_piece):
+        self.source_pos, self.target_pos = move
+        self.source_piece = source_piece
+        self.target_piece = target_piece
+
+        self.source_row = self.source_pos[0]
+        self.source_col = self.source_pos[1]
+        self.target_row = self.target_pos[0]
+        self.target_col = self.target_pos[1]
+
+        self.source_color = source_piece[0]
+        self.target_color = target_piece[1]
+
+        self.change_in_row = self.target_row - self.source_row
+        self.change_in_col = self.target_col - self.source_col
+        self.row_length = abs(self.target_row - self.source_row)
+        self.col_length = abs(self.target_col - self.source_col)
+
+
     @abstractmethod
-    def validate(self, move, color, start, end):
+    def validate(self):
         """
         Checks whether a chess piece has made a valid move.
-
-        Parameters:
-        move (list): List of tuples indicating the start and ending pieces.
-        color (bool): The color of the starting piece.
-        start (int): The starting move index.
-        end (int): The ending move index.
 
         Returns:
         bool: True if the move is valid, False otherwise.
@@ -22,40 +36,25 @@ class Piece(ABC):
 
 
 class King(Piece):
-    def validate(self, move, color, start, end):
-        start_row, start_col = start
-        end_row, end_col = end
-
-        row_length = abs(end_row - start_row)
-        col_length = abs(end_col - start_col)
-
-        if row_length <= 1 & col_length <= 1:
+    def validate(self):
+        if self.row_length <= 1 & self.col_length <= 1:
             return True
 
         return False
 
 
 class Bishop(Piece):
-    def validate(self, move, color, start, end):
-        start_row, start_col = start
-        end_row, end_col = end
-
-        row_length = abs(end_row - start_row)
-        col_length = abs(end_col - start_col)
-
-        if row_length == col_length:
+    def validate(self):
+        if self.row_length == self.col_length:
             return True
 
         return False
 
 
 class Rook(Piece):
-    def validate(self, move, color, start, end):
-        start_row, start_col = start
-        end_row, end_col = end
-
-        on_same_row = start_row == end_row
-        on_same_col = start_col == end_col
+    def validate(self):
+        on_same_row = self.source_row == self.target_row
+        on_same_col = self.source_col == self.target_col
 
         if on_same_row or on_same_col:
             return True
@@ -64,20 +63,14 @@ class Rook(Piece):
 
 
 class Queen(Piece):
-    def validate(self, move, color, start, end):
-        start_row, start_col = start
-        end_row, end_col = end
-
+    def validate(self):
         # Check if the move is valid as a bishop move
-        row_length = abs(end_row - start_row)
-        col_length = abs(end_col - start_col)
-
-        if row_length == col_length:
+        if self.row_length == self.col_length:
             return True
 
         # Check if the move is valid as a rook move
-        on_same_row = start_row == end_row
-        on_same_col = start_col == end_col
+        on_same_row = self.source_row == self.target_row
+        on_same_col = self.source_col == self.target_col
 
         if on_same_row or on_same_col:
             return True
@@ -86,73 +79,42 @@ class Queen(Piece):
 
 
 class Knight(Piece):
-    def validate(self, move, color, start, end):
-        start_row, start_col = start
-        end_row, end_col = end
-
-        row_length = abs(end_row - start_row)
-        col_length = abs(end_col - start_col)
-
-        if row_length == 2 and col_length == 1:
+    def validate(self):
+        if self.row_length == 2 and self.col_length == 1:
             return True
 
-        if row_length == 1 and col_length == 2:
+        if self.row_length == 1 and self.col_length == 2:
             return True
 
         return False
 
 
 class Pawn(Piece):
+    def validate(self):
+        if self.source_color == 'w':
+            pawn_start_row = 6
+            direction = -1
+        else:
+            pawn_start_row = 1
+            direction = 1
 
-    def _is_valid_attack(self, move, color, start_row, start_col, end_row, end_col):
-        """Checks if pawn is attacking diagonal square."""
+        is_attacking_diagonal = self.row_length == self.col_length == 1
+        is_correct_direction = self.change_in_row == direction
+        is_attacking_piece = self.target_piece != EMPTY
 
-        row_length = abs(end_row - start_row)
-        col_length = abs(end_col - start_col)
-        change_in_row = end_row - start_row
-
-        direction = -1 if color == 'w' else 1
-
-        is_attacking_diagonal = row_length == col_length == 1
-        is_correct_direction = change_in_row == direction
-        is_attacking_piece = move[1] != EMPTY
-
-        if is_attacking_diagonal and is_correct_direction and is_attacking_piece:
+        # Validate attack
+        if is_attacking_diagonal and is_attacking_piece and is_correct_direction:
             return True
 
-        return False
+        on_same_col = self.source_col == self.target_col
+        total_allowed_steps = 2 if self.source_row == pawn_start_row else 1
 
-
-    def validate(self, move, color, start, end):
-        start_row, start_col = start
-        end_row, end_col = end
-
-        valid_attack = self._is_valid_attack(move, color, start_row, start_col, end_row, end_col)
-
-        if valid_attack:
-            return True
-
-        pawn_starting_row = 6 if color == 'w' else 1
-
-        on_same_col = start_col == end_col
-        steps_taken = end_row - start_row
-        total_allowed_steps = 2 if start_row == pawn_starting_row else 1
-
-        if (color == 'w' and steps_taken > 0) or (color == 'b' and steps_taken < 0):
+        # Pawn must face right direction
+        if ((self.source_color == 'w' and self.change_in_row > 0) or
+            (self.source_color == 'b' and self.change_in_row < 0)):
             return False
 
-        if on_same_col and abs(steps_taken) <= total_allowed_steps:
-            return True
+        if not on_same_col or self.row_length > total_allowed_steps:
+            return False
 
-        return False
-
-
-
-
-
-
-
-
-
-
-
+        return True

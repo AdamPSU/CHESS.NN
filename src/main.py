@@ -16,8 +16,8 @@ def _highlight_valid_moves(screen, valid_moves):
     with a black circle.
     """
 
-    for move in valid_moves:
-        row, col = move
+    for pos in valid_moves:
+        row, col = pos
 
         surface = pg.Surface((TILE_SIZE, TILE_SIZE), pg.SRCALPHA)
 
@@ -50,10 +50,9 @@ class Chess:
         self.marked_moves = set()
         self.valid_moves = set()
 
-        self.start_piece = None
-
-        self.start_loc = None
-        self.target_loc = None
+        self.source_piece = None
+        self.source_pos = None
+        self.target_pos = None
 
         load_grid(self.screen)
 
@@ -78,8 +77,8 @@ class Chess:
 
                     left_click = event.button == 1
                     if left_click and current_piece is not None:
-                        self.start_piece = current_piece
-                        self.start_loc = (row, col)
+                        self.source_piece = current_piece
+                        self.source_pos = (row, col)
 
                         if current_piece != EMPTY:
                             self.generate_moves()
@@ -87,16 +86,16 @@ class Chess:
                 if event.type == pg.MOUSEBUTTONUP:
                     self.valid_moves.clear()
 
-                    if self.target_loc:
-                        self.move_handler(self.start_loc, self.target_loc)
+                    if self.target_pos:
+                        self.move_handler(self.source_pos, self.target_pos)
 
-                    self.start_loc = None
-                    self.target_loc = None
+                    self.source_pos = None
+                    self.target_pos = None
 
             graphics(self.screen, self.engine.board, self.marked_moves)
             _highlight_valid_moves(self.screen, self.valid_moves)
 
-            self.target_loc = self.drag(self.start_piece, self.start_loc)
+            self.target_pos = self.drag(self.source_piece, self.source_pos)
 
             self.clock.tick(MAX_FPS)
             pg.display.flip()
@@ -114,9 +113,10 @@ class Chess:
 
         try:
             if row >= 0 and col >= 0:
-                piece_idx = (row, col)
+                pos = (row, col)
+                current_piece = piece_name(self.engine.board, pos)
 
-                return piece_name(self.engine.board, piece_idx), row, col
+                return current_piece, row, col
 
         except IndexError:
             pass
@@ -140,12 +140,12 @@ class Chess:
             self.marked_moves.clear()
 
         elif right_click:
-            tile = (row, col)
+            pos = (row, col)
 
-            if tile in self.marked_moves:
-                self.marked_moves.discard(tile)
+            if pos in self.marked_moves:
+                self.marked_moves.discard(pos)
             else:
-                self.marked_moves.add(tile)
+                self.marked_moves.add(pos)
 
 
     def generate_moves(self):
@@ -158,7 +158,7 @@ class Chess:
             self.valid_moves.clear()
 
         for loc, valid_move in gen_valid_moves(self.engine.board, self.white_to_move,
-                                               self.start_piece, self.start_loc):
+                                               self.source_piece, self.source_pos):
             if valid_move:
                 self.valid_moves.add(loc)
 
