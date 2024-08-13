@@ -10,6 +10,9 @@ from chess.pieces import (
 from src.config import EMPTY, BOARD_SIZE
 from chess.utils import piece_name
 
+# TODO: Refactor Move() so as to not have to call it every time
+# this will enable flagging of pawn en passant moves and rook castling rights
+
 CHESS_BOARD =[['bR', 'bN', 'bB', 'bQ', 'bK', 'bB', 'bN', 'bR'],
               ['bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp'],
               ['--', '--', '--', '--', '--', '--', '--', '--'],
@@ -20,8 +23,7 @@ CHESS_BOARD =[['bR', 'bN', 'bB', 'bQ', 'bK', 'bB', 'bN', 'bR'],
               ['wR', 'wN', 'wB', 'wQ', 'wK', 'wB', 'wN', 'wR']]
 
 
-
-def _piece_type(move, source_piece, target_piece, history=None):
+def _get_piece_type(move, source_piece, target_piece, history=None):
     """Maps to each piece the associated piece type code."""
 
     piece_type = source_piece[1]
@@ -111,7 +113,7 @@ def gen_valid_moves(board, history, white_to_move, source_piece, source_pos):
             target_color = target_piece[0]
 
             move = [source_pos, target_pos]
-            piece = _piece_type(move, source_piece, target_piece, history)
+            piece = _get_piece_type(move, source_piece, target_piece, history)
 
             is_white_piece = True if source_color == 'w' else False
 
@@ -143,7 +145,7 @@ def gen_valid_moves(board, history, white_to_move, source_piece, source_pos):
 
 
 class Move:
-    def __init__(self, board, history, white_to_move, source_pos, target_pos):
+    def __init__(self, board, history, white_to_move):
         """
         Initializes a Move object.
 
@@ -153,26 +155,16 @@ class Move:
         board (list): The current state of the chess board.
         """
 
-        self.source_pos = source_pos
-        self.target_pos = target_pos
         self.board = board
         self.history = history
         self.white_to_move = white_to_move
 
-        self.source_row, self.source_col = source_pos
+        # For castling rights
+        self.king_moved = False
+        self.l_rook_moved = True
+        self.r_rook_moved = True
 
-        self.source_piece = piece_name(board, source_pos)
-        self.source_color = self.source_piece[0]
-        self.source_type = self.source_piece[1]
-
-        self.target_row, self.target_col = target_pos
-
-        self.target_piece = piece_name(board, target_pos)
-        self.target_color = self.target_piece[0]
-        self.target_type = self.target_piece[1]
-
-
-    def validate(self):
+    def validate(self, source_pos, target_pos):
         """
         Checks if the move is valid based on the current board state.
 
@@ -180,7 +172,13 @@ class Move:
         bool: True if the move is valid, False otherwise.
         """
 
-        is_white_piece = True if self.source_color == 'w' else False
+        source_piece = piece_name(self.board, source_pos)
+        target_piece = piece_name(self.board, target_pos)
+
+        source_color = source_piece[0]
+        target_color = target_piece[0]
+
+        is_white_piece = True if source_color == 'w' else False
 
         # Turn validation
         if self.white_to_move and not is_white_piece:
@@ -190,20 +188,20 @@ class Move:
             return False, None
 
         # Cannot attack friendly squares
-        if self.source_color == self.target_color:
+        if source_color == target_color:
             return False, None
 
         # For piece-specific validation
-        move = [self.source_pos, self.target_pos]
-        piece = _piece_type(move, self.source_piece, self.target_piece, self.history)
+        move = [source_pos, target_pos]
+        piece = _get_piece_type(move, source_piece, target_piece, self.history)
 
         is_valid_piece, move_type = piece.validate()
 
         if not is_valid_piece:
             return False, None
 
-        is_path_clear = _is_path_clear(self.board, self.source_piece,
-                                       self.source_pos, self.target_pos)
+        is_path_clear = _is_path_clear(self.board, source_piece,
+                                       source_pos, target_pos)
 
         if not is_path_clear:
             return False, None
@@ -211,6 +209,7 @@ class Move:
         self.white_to_move = not self.white_to_move
 
         return True, move_type
+
 
 
     def log_turn(self):
@@ -230,7 +229,7 @@ class Engine:
         self.history = [(move, piece_names, CHESS_BOARD)] # Keeps track of board state
 
 
-    def perform_move(self, source_pos, target_pos, en_passant=False):
+    def perform_move(self, source_pos, target_pos, en_passant=False, castle=False):
         """
         Attempts to make a move and updates the game state accordingly.
 
@@ -260,6 +259,33 @@ class Engine:
 
             en_passant_col = target_col
             self.board[en_passant_row][en_passant_col] = EMPTY
+
+        if castle:
+            source_piece_color = source_piece_name[0]
+
+            if source_piece_color == 'w':
+                left_rook, right_rook = (7, 0), (7, 7)
+                queenside, kingside = (7, 2), (7, 6)
+            else:
+                left_rook, right_rook = (0, 0), (0, 7)
+                queenside, kingside = (0, 2), (0, 6)
+
+            if target_pos == queenside:
+                rook_row, rook_col = left_rook
+                king_row, king_col = source_pos
+
+                self.board[rook_row][rook_col+3] = self.board[rook_row][rook_col]
+                self.board[king_row][king_col-3] = self.board[king_row][king_col]
+                self.board[rook_row][rook_col] = EMPTY
+                self.board[king_row][king_col] = EMPTY
+            elif target_pos == kingside:
+                rook_row, rook_col = right_rook
+                king_row, king_col = source_pos
+
+                self.board[rook_row][rook_col-2] = self.board[rook_row][rook_col]
+                self.board[king_row][king_col+3] = self.board[king_row][king_col]
+                self.board[rook_row][rook_col] = EMPTY
+                self.board[king_row][king_col] = EMPTY
 
         new_entry = ((source_pos, target_pos), (source_piece_name, target_piece_name), self.board)
         self.history.append(new_entry)

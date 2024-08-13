@@ -4,6 +4,7 @@ from src.config import EMPTY
 
 # TODO: Pawn promotions
 # TODO: King checks
+# TODO: Castling
 
 class Piece(ABC):
     def __init__(self, move, source_piece, target_piece, history=None):
@@ -39,10 +40,21 @@ class Piece(ABC):
 
 class King(Piece):
     def validate(self):
-        if self.row_length <= 1 & self.col_length <= 1:
-            return True, "normal"
+        if self.source_color == 'w':
+            castle = {(7, 6), (7, 2)}
+            king_default_pos = (7, 4)
 
-        return False, None
+        else:
+            castle = {(0, 6), (0, 2)}
+            king_default_pos = (0, 4)
+
+        if self.source_pos == king_default_pos and self.target_pos in castle:
+            return True, "castle"
+
+        if self.row_length > 1 or self.col_length > 1:
+            return False, None
+
+        return True, "normal"
 
 
 class Bishop(Piece):

@@ -10,7 +10,7 @@ from src.graphics import IMAGES
 
 def _highlight_valid_moves(screen, valid_moves):
     """
-    This function is responsible the visualization
+    This function is responsible for the visualization
     of the move space for the clicked piece. If a
     move is valid, it will be "highlighted," or marked
     with a black circle.
@@ -44,8 +44,9 @@ class Chess:
         pg.display.set_caption("CHESS-NN")
         self.clock = pg.time.Clock()
 
-        self.engine = Engine()
         self.white_to_move = True
+        self.engine = Engine()
+        self.move = Move(self.engine.board, self.engine.history, self.white_to_move)
 
         self.marked_moves = set()
         self.valid_moves = set()
@@ -202,8 +203,7 @@ class Chess:
         and updates the game state accordingly.
         """
 
-        move = Move(self.engine.board, self.engine.history, self.white_to_move, source, target)
-        is_valid_move, move_type = move.validate()
+        is_valid_move, move_type = self.move.validate(source, target)
 
         if not is_valid_move:
             return
@@ -215,7 +215,12 @@ class Chess:
         else:
             is_en_passant = False
 
-        self.engine.perform_move(source, target, is_en_passant)
+        if move_type == "castle":
+            is_castle = True
+        else:
+            is_castle = False
+
+        self.engine.perform_move(source, target, is_en_passant, is_castle)
 
 
 if __name__ == '__main__':
