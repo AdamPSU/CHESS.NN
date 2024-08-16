@@ -10,9 +10,6 @@ from chess.pieces import (
 from src.config import EMPTY, BOARD_SIZE
 from chess.utils import piece_name
 
-# TODO: Refactor Move() so as to not have to call it every time
-# this will enable flagging of pawn en passant moves and rook castling rights
-
 CHESS_BOARD =[['bR', 'bN', 'bB', 'bQ', 'bK', 'bB', 'bN', 'bR'],
               ['bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp'],
               ['--', '--', '--', '--', '--', '--', '--', '--'],
@@ -22,11 +19,17 @@ CHESS_BOARD =[['bR', 'bN', 'bB', 'bQ', 'bK', 'bB', 'bN', 'bR'],
               ['wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp'],
               ['wR', 'wN', 'wB', 'wQ', 'wK', 'wB', 'wN', 'wR']]
 
-
-def _get_piece_type(move, source_piece, target_piece, history=None):
+def _get_piece_object(move, source_piece, target_piece, history=None, castle=None):
     """Maps to each piece the associated piece type code."""
 
     piece_type = source_piece[1]
+    extra_info = {}
+
+    if history and piece_type == 'p':
+        extra_info['history'] = history
+
+    if castle and piece_type == 'K':
+        extra_info['castling_rights'] = castle
 
     piece_map = {
         'p': Pawn,
@@ -45,12 +48,19 @@ def _get_piece_type(move, source_piece, target_piece, history=None):
             f"is correct. Invalid piece: '{source_piece}'."
         )
 
-    require_history = {'p', 'K', 'R'}
+    return Piece(move, source_piece, target_piece, **extra_info)
 
-    if history and piece_type in require_history:
-        return Piece(move, source_piece, target_piece, history)
 
-    return Piece(move, source_piece, target_piece)
+def _get_castle_pos(color):
+    if color == 'w':
+        left_rook, right_rook = (7, 0), (7, 7)
+        queenside, kingside = (7, 2), (7, 6)
+    else:
+        left_rook, right_rook = (0, 0), (0, 7)
+        queenside, kingside = (0, 2), (0, 6)
+
+    return left_rook, right_rook, queenside, kingside
+
 
 
 def _is_path_clear(board, source_piece, source_pos, target_pos):
@@ -93,7 +103,7 @@ def _is_path_clear(board, source_piece, source_pos, target_pos):
     return True
 
 
-def gen_valid_moves(board, history, white_to_move, source_piece, source_pos):
+def gen_valid_moves(board, history, white_to_move, source_piece, source_pos, castling_rights):
     """
     Generates the available move space for the selected piece.
     This works by simulating all possible target locations and
@@ -113,7 +123,7 @@ def gen_valid_moves(board, history, white_to_move, source_piece, source_pos):
             target_color = target_piece[0]
 
             move = [source_pos, target_pos]
-            piece = _get_piece_type(move, source_piece, target_piece, history)
+            piece = _get_piece_object(move, source_piece, target_piece, history, castling_rights)
 
             is_white_piece = True if source_color == 'w' else False
 
@@ -160,9 +170,8 @@ class Move:
         self.white_to_move = white_to_move
 
         # For castling rights
-        self.king_moved = False
-        self.l_rook_moved = True
-        self.r_rook_moved = True
+        self.castling_rights = {'w_kingside': True, 'w_queenside': True,
+                                'b_kingside': True, 'b_queenside': True}
 
     def validate(self, source_pos, target_pos):
         """
@@ -193,7 +202,8 @@ class Move:
 
         # For piece-specific validation
         move = [source_pos, target_pos]
-        piece = _get_piece_type(move, source_piece, target_piece, self.history)
+        piece = _get_piece_object(move, source_piece, target_piece,
+                                  self.history, self.castling_rights)
 
         is_valid_piece, move_type = piece.validate()
 
@@ -208,8 +218,24 @@ class Move:
 
         self.white_to_move = not self.white_to_move
 
+        source_type = source_piece[1]
+        self.update_castle(source_pos, source_type, source_color)
+
         return True, move_type
 
+
+    def update_castle(self, source_pos, source_type, source_color):
+        if source_type == 'K':
+            self.castling_rights[f'{source_color}_kingside'] = False
+            self.castling_rights[f'{source_color}_queenside'] = False
+
+        if source_type == 'R':
+            left_rook_pos, right_rook_pos, _, _ = _get_castle_pos(source_color)
+
+            if source_pos == right_rook_pos:
+                self.castling_rights[f'{source_color}_kingside'] = False
+            elif source_pos == left_rook_pos:
+                self.castling_rights[f'{source_color}_queenside'] = False
 
 
     def log_turn(self):
@@ -229,7 +255,7 @@ class Engine:
         self.history = [(move, piece_names, CHESS_BOARD)] # Keeps track of board state
 
 
-    def perform_move(self, source_pos, target_pos, en_passant=False, castle=False):
+    def perform_move(self, source_pos, target_pos, special_move):
         """
         Attempts to make a move and updates the game state accordingly.
 
@@ -244,15 +270,15 @@ class Engine:
         source_row, source_col = source_pos
         target_row, target_col = target_pos
 
-        source_piece_name = piece_name(self.board, source_pos)
-        target_piece_name = piece_name(self.board, target_pos)
+        source_name = piece_name(self.board, source_pos)
+        target_name = piece_name(self.board, target_pos)
 
         self.board[target_row][target_col] = self.board[source_row][source_col]
         self.board[source_row][source_col] = EMPTY
 
-        if en_passant:
-            source_piece_color = source_piece_name[0]
-            if source_piece_color == 'w':
+        if special_move == "en passant":
+            source_color = source_name[0]
+            if source_color == 'w':
                 en_passant_row = target_row + 1
             else:
                 en_passant_row = target_row - 1
@@ -260,15 +286,9 @@ class Engine:
             en_passant_col = target_col
             self.board[en_passant_row][en_passant_col] = EMPTY
 
-        if castle:
-            source_piece_color = source_piece_name[0]
-
-            if source_piece_color == 'w':
-                left_rook, right_rook = (7, 0), (7, 7)
-                queenside, kingside = (7, 2), (7, 6)
-            else:
-                left_rook, right_rook = (0, 0), (0, 7)
-                queenside, kingside = (0, 2), (0, 6)
+        if special_move == "castle":
+            source_color = source_name[0]
+            left_rook, right_rook, queenside, kingside = _get_castle_pos(source_color)
 
             if target_pos == queenside:
                 rook_row, rook_col = left_rook
@@ -287,7 +307,7 @@ class Engine:
                 self.board[rook_row][rook_col] = EMPTY
                 self.board[king_row][king_col] = EMPTY
 
-        new_entry = ((source_pos, target_pos), (source_piece_name, target_piece_name), self.board)
+        new_entry = ((source_pos, target_pos), (source_name, target_name), self.board)
         self.history.append(new_entry)
 
 

@@ -159,7 +159,8 @@ class Chess:
             self.valid_moves.clear()
 
         for loc, valid_move in gen_valid_moves(self.engine.board, self.engine.history,
-                                               self.white_to_move, self.source_piece, self.source_pos):
+                                               self.white_to_move, self.source_piece, self.source_pos,
+                                               self.move.castling_rights):
             if valid_move:
                 self.valid_moves.add(loc)
 
@@ -210,17 +211,7 @@ class Chess:
 
         self.white_to_move = not self.white_to_move
 
-        if move_type == "en passant":
-            is_en_passant = True
-        else:
-            is_en_passant = False
-
-        if move_type == "castle":
-            is_castle = True
-        else:
-            is_castle = False
-
-        self.engine.perform_move(source, target, is_en_passant, is_castle)
+        self.engine.perform_move(source, target, special_move=move_type)
 
 
 if __name__ == '__main__':

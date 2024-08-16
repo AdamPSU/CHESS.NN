@@ -7,11 +7,12 @@ from src.config import EMPTY
 # TODO: Castling
 
 class Piece(ABC):
-    def __init__(self, move, source_piece, target_piece, history=None):
+    def __init__(self, move, source_piece, target_piece, history=None, castling_rights=None):
         self.source_pos, self.target_pos = move
         self.source_piece = source_piece
         self.target_piece = target_piece
         self.history = history
+        self.castling_rights = castling_rights
 
         self.source_row = self.source_pos[0]
         self.source_col = self.source_pos[1]
@@ -41,14 +42,20 @@ class Piece(ABC):
 class King(Piece):
     def validate(self):
         if self.source_color == 'w':
-            castle = {(7, 6), (7, 2)}
             king_default_pos = (7, 4)
+            castle = ((7, 2), (7, 6))
 
         else:
-            castle = {(0, 6), (0, 2)}
             king_default_pos = (0, 4)
+            castle = ((0, 2), (0, 6))
 
         if self.source_pos == king_default_pos and self.target_pos in castle:
+            queenside = castle[0]
+            side = 'queenside' if self.target_pos == queenside else 'kingside'
+
+            if not self.castling_rights[f'{self.source_color}_{side}']:
+                return False, None
+
             return True, "castle"
 
         if self.row_length > 1 or self.col_length > 1:
