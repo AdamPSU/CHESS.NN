@@ -69,6 +69,32 @@ def update_pieces(screen, board):
             screen.blit(piece_image, piece_rect.topleft)
 
 
+def highlight_valid_moves(screen, valid_moves):
+    """
+    This function is responsible for the visualization
+    of the move space for the clicked piece. If a
+    move is valid, it will be "highlighted," or marked
+    with a black circle.
+    """
+
+    for pos in valid_moves:
+        row, col = pos
+
+        surface = pg.Surface((TILE_SIZE, TILE_SIZE), pg.SRCALPHA)
+
+        # Circles must be centered within the tile
+        center = (TILE_SIZE // 2, TILE_SIZE // 2)
+        radius = TILE_SIZE // 6
+
+        alpha = 120
+        black = (51, 55, 76, alpha)
+
+        pg.draw.circle(surface, black, center, radius)
+
+        screen.blit(surface, (col * TILE_SIZE, row * TILE_SIZE))
+
+
+
 def _highlight_tile(screen, tile):
     if None in tile:
         return

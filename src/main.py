@@ -2,35 +2,10 @@ import pygame as pg
 
 from chess.engine import Engine, Move, gen_valid_moves
 from chess.utils import piece_name
-from src.graphics import draw_rect, load_pieces, load_grid, graphics; load_pieces()
+from src.graphics import draw_rect, load_pieces, load_grid, highlight_valid_moves, graphics; load_pieces()
 
 from src.config import *
 from src.graphics import IMAGES
-
-
-def _highlight_valid_moves(screen, valid_moves):
-    """
-    This function is responsible for the visualization
-    of the move space for the clicked piece. If a
-    move is valid, it will be "highlighted," or marked
-    with a black circle.
-    """
-
-    for pos in valid_moves:
-        row, col = pos
-
-        surface = pg.Surface((TILE_SIZE, TILE_SIZE), pg.SRCALPHA)
-
-        # Circles must be centered within the tile
-        center = (TILE_SIZE // 2, TILE_SIZE // 2)
-        radius = TILE_SIZE // 6
-
-        alpha = 120
-        black = (51, 55, 76, alpha)
-
-        pg.draw.circle(surface, black, center, radius)
-
-        screen.blit(surface, (col * TILE_SIZE, row * TILE_SIZE))
 
 
 class Chess:
@@ -94,7 +69,7 @@ class Chess:
                     self.target_pos = None
 
             graphics(self.screen, self.engine.board, self.marked_moves)
-            _highlight_valid_moves(self.screen, self.valid_moves)
+            highlight_valid_moves(self.screen, self.valid_moves)
 
             self.target_pos = self.drag(self.source_piece, self.source_pos)
 
