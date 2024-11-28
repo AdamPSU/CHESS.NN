@@ -14,10 +14,6 @@ CHESS.NN is a project aimed at developing a chess engine using Python. The engin
 - Customizable difficulty levels for adjusting the computer's strength.
 - Command-line interface for easy interaction.
 
-## Future Plans
-
-In the future, we plan to enhance CHESS.NN by incorporating neural network techniques to train a chess AI. This will involve leveraging machine learning algorithms to improve the computer player's decision-making abilities, making it an even more formidable opponent. Stay tuned for updates on our progress in this exciting endeavor!
-
 ## Getting Started
 
 To get started with CHESS.NN, follow these steps:
