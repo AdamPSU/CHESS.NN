@@ -19,14 +19,15 @@ class Piece(ABC):
         self.target_row = self.target_pos[0]
         self.target_col = self.target_pos[1]
 
+        # Color is encoded as first character of piece string, e.g., 'wP' -> 'w'
         self.source_color = source_piece[0]
-        self.target_color = target_piece[1]
+        self.target_color = target_piece[0]
 
+        # Relative movement deltas
         self.change_in_row = self.target_row - self.source_row
         self.change_in_col = self.target_col - self.source_col
-        self.row_length = abs(self.target_row - self.source_row)
-        self.col_length = abs(self.target_col - self.source_col)
-
+        self.row_length = abs(self.change_in_row)
+        self.col_length = abs(self.change_in_col)
 
     @abstractmethod
     def validate(self):
@@ -41,23 +42,24 @@ class Piece(ABC):
 
 class King(Piece):
     def validate(self):
+        # Determine initial kingside/queenside positions by color
         if self.source_color == 'w':
             king_default_pos = (7, 4)
-            castle = ((7, 2), (7, 6))
-
+            castle_positions = ((7, 2), (7, 6))
         else:
             king_default_pos = (0, 4)
-            castle = ((0, 2), (0, 6))
+            castle_positions = ((0, 2), (0, 6))
 
-        if self.source_pos == king_default_pos and self.target_pos in castle:
-            queenside = castle[0]
-            side = 'queenside' if self.target_pos == queenside else 'kingside'
-
-            if not self.castling_rights[f'{self.source_color}_{side}']:
+        # Castling attempt: king must be in start square and target one of the rooks' positions
+        if self.source_pos == king_default_pos and self.target_pos in castle_positions:
+            queenside_target, kingside_target = castle_positions
+            side = 'queenside' if self.target_pos == queenside_target else 'kingside'
+            # Check castling rights mapping, e.g., 'w_kingside': True/False
+            if not self.castling_rights.get(f'{self.source_color}_{side}', False):
                 return False, None
-
             return True, "castle"
 
+        # Normal king move: at most one square in any direction
         if self.row_length > 1 or self.col_length > 1:
             return False, None
 
@@ -66,113 +68,89 @@ class King(Piece):
 
 class Bishop(Piece):
     def validate(self):
+        # Bishop moves strictly along diagonals
         if self.row_length == self.col_length:
             return True, "normal"
-
         return False, None
 
 
 class Rook(Piece):
     def validate(self):
-        on_same_row = self.source_row == self.target_row
-        on_same_col = self.source_col == self.target_col
-
-        if on_same_row or on_same_col:
+        # Rook moves orthogonally: along same row or same column
+        if self.source_row == self.target_row or self.source_col == self.target_col:
             return True, "normal"
-
         return False, None
 
 
 class Queen(Piece):
     def validate(self):
-        # Check if the move is valid as a bishop move
+        # Queen combines rook and bishop movement
         if self.row_length == self.col_length:
             return True, "normal"
-
-        # Check if the move is valid as a rook move
-        on_same_row = self.source_row == self.target_row
-        on_same_col = self.source_col == self.target_col
-
-        if on_same_row or on_same_col:
+        if self.source_row == self.target_row or self.source_col == self.target_col:
             return True, "normal"
-
         return False, None
 
 
 class Knight(Piece):
     def validate(self):
-        if self.row_length == 2 and self.col_length == 1:
+        # L-shaped moves: two in one direction and one in the perpendicular
+        if (self.row_length == 2 and self.col_length == 1) or \
+           (self.row_length == 1 and self.col_length == 2):
             return True, "normal"
-
-        if self.row_length == 1 and self.col_length == 2:
-            return True, "normal"
-
         return False, None
 
 
 class Pawn(Piece):
     def __init__(self, move, source_piece, target_piece, history):
         super().__init__(move, source_piece, target_piece, history)
-
-        if self.history is not None:
-            self.prev_source_pos = self.history[-1][0][0]
-            self.prev_target_pos = self.history[-1][0][1]
-
-            self.prev_source_piece = self.history[-1][1][0]
-            self.prev_target_piece = self.history[-1][1][1]
-
+        # Unpack the last move from history, if available, to evaluate en passant
+        if self.history:
+            last_move, last_pieces = self.history[-1]
+            self.prev_source_pos, self.prev_target_pos = last_move
+            self.prev_source_piece, self.prev_target_piece = last_pieces
 
     def validate(self):
+        # Set direction and starting rows by color
         if self.source_color == 'w':
             pawn_start_row = 6
             en_passant_row = 3
-            direction = -1
+            direction = -1  # white moves up the board
         else:
             pawn_start_row = 1
             en_passant_row = 4
-            direction = 1
+            direction = 1   # black moves down the board
 
-        is_attacking_diagonal = self.row_length == self.col_length == 1
-        is_attacking_piece = self.target_piece != EMPTY
-        is_correct_direction = self.change_in_row == direction
+        is_diag_move = self.row_length == self.col_length == 1
+        is_forward_step = self.change_in_row == direction
 
-        # Validate en passant
-        if (is_attacking_diagonal and is_correct_direction and not is_attacking_piece) and (
-        self.source_row == en_passant_row and self.row_length == 1):
-            if self.history is not None:
-                is_pawn = self.prev_source_piece[1] == 'p'
-
-                if is_pawn:
-                    prev_source_row, prev_source_col = self.prev_source_pos
-                    prev_target_row, prev_target_col = self.prev_target_pos
-
-                    prev_row_length = abs(prev_target_row - prev_source_row)
-
-                    # Check if the enemy pawn moved two squares and is next to our pawn
-                    if (prev_row_length == 2 and prev_target_col == self.target_col and
-                        abs(self.source_col - prev_target_col) == 1):
+        # En passant condition: diagonal empty capture on correct turn
+        if is_diag_move and is_forward_step and self.target_piece == EMPTY:
+            # Pawn must be on the correct rank to perform en passant
+            if self.source_row == en_passant_row and self.history:
+                # Ensure last moved piece was a pawn that did a two-square advance next to us
+                if self.prev_source_piece[1] == 'p':
+                    prev_src_r, prev_src_c = self.prev_source_pos
+                    prev_tgt_r, prev_tgt_c = self.prev_target_pos
+                    if abs(prev_tgt_r - prev_src_r) == 2 and \
+                       prev_tgt_c == self.target_col and \
+                       abs(self.source_col - prev_tgt_c) == 1:
                         return True, "en passant"
 
-        # Validate attack
-        if is_attacking_diagonal and is_attacking_piece and is_correct_direction:
+        # Standard capture: diagonal occupied by opponent
+        if is_diag_move and self.target_piece != EMPTY and is_forward_step:
             return True, "normal"
 
         on_same_col = self.source_col == self.target_col
-        total_allowed_steps = 2 if self.source_row == pawn_start_row else 1
+        max_steps = 2 if self.source_row == pawn_start_row else 1
 
-        # Pawn must face right direction
-        if ((self.source_color == 'w' and self.change_in_row > 0) or
-            (self.source_color == 'b' and self.change_in_row < 0)):
+        # Prevent backward moves
+        if (self.source_color == 'w' and self.change_in_row > 0) or \
+           (self.source_color == 'b' and self.change_in_row < 0):
             return False, None
 
-        if not on_same_col or self.row_length > total_allowed_steps or self.target_piece != EMPTY:
+        # Forward moves must be unobstructed and within allowed step count
+        if not on_same_col or self.row_length > max_steps or self.target_piece != EMPTY:
             return False, None
 
         return True, "normal"
-
-
-
-
-
-
-

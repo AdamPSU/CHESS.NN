@@ -10,27 +10,33 @@ from chess.pieces import (
 from src.config import EMPTY, BOARD_SIZE
 from chess.utils import piece_name
 
-CHESS_BOARD =[['bR', 'bN', 'bB', 'bQ', 'bK', 'bB', 'bN', 'bR'],
-              ['bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp'],
-              ['--', '--', '--', '--', '--', '--', '--', '--'],
-              ['--', '--', '--', '--', '--', '--', '--', '--'],
-              ['--', '--', '--', '--', '--', '--', '--', '--'],
-              ['--', '--', '--', '--', '--', '--', '--', '--'],
-              ['wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp'],
-              ['wR', 'wN', 'wB', 'wQ', 'wK', 'wB', 'wN', 'wR']]
+# Standard starting layout for an 8x8 chess board, using two-character codes:
+# first char for color ('w' or 'b'), second for piece type.
+CHESS_BOARD = [
+    ['bR', 'bN', 'bB', 'bQ', 'bK', 'bB', 'bN', 'bR'],
+    ['bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp'],
+    ['--', '--', '--', '--', '--', '--', '--', '--'],
+    ['--', '--', '--', '--', '--', '--', '--', '--'],
+    ['--', '--', '--', '--', '--', '--', '--', '--'],
+    ['--', '--', '--', '--', '--', '--', '--', '--'],
+    ['wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp'],
+    ['wR', 'wN', 'wB', 'wQ', 'wK', 'wB', 'wN', 'wR']
+]
 
 def _get_piece_object(move, source_piece, target_piece, history=None, castle=None):
-    """Maps to each piece the associated piece type code."""
-
+    """Instantiate the correct Piece subclass based on source_piece code."""
     piece_type = source_piece[1]
     extra_info = {}
 
+    # Pass pawn movement history to Pawn for en passant logic
     if history and piece_type == 'p':
         extra_info['history'] = history
 
+    # Pass castling rights to King for castle validation
     if castle and piece_type == 'K':
         extra_info['castling_rights'] = castle
 
+    # Map the second character in the piece code to the appropriate class
     piece_map = {
         'p': Pawn,
         'N': Knight,
@@ -41,17 +47,22 @@ def _get_piece_object(move, source_piece, target_piece, history=None, castle=Non
     }
 
     Piece = piece_map.get(piece_type)
-
     if Piece is None:
         raise ValueError(
             f"Piece type is not supported. Please make sure the provided piece "
             f"is correct. Invalid piece: '{source_piece}'."
         )
 
+    # Create the piece instance with its move, source, target and extra params
     return Piece(move, source_piece, target_piece, **extra_info)
 
 
 def _get_castle_pos(color):
+    """
+    Determine rook starting squares and king target squares for castling
+    based on color ('w' or 'b').
+    Returns (left_rook, right_rook, queenside_target, kingside_target).
+    """
     if color == 'w':
         left_rook, right_rook = (7, 0), (7, 7)
         queenside, kingside = (7, 2), (7, 6)
@@ -62,91 +73,72 @@ def _get_castle_pos(color):
     return left_rook, right_rook, queenside, kingside
 
 
-
 def _is_path_clear(board, source_piece, source_pos, target_pos):
     """
-    Checks if a piece is standing along the selected piece's
-    trajectory before reaching the target index. For knights,
-    this function is unnecessary, as they can can jump over pieces
-    freely.
+    Check all intermediate squares along a piece's straight-line trajectory.
+    Knights are excluded, as they jump.
     """
-
     source_type = source_piece[1]
-    knight = source_type == 'N'
+    if source_type == 'N':
+        return True  # knights ignore intervening pieces
 
-    # Knights don't need this validation
-    if knight:
-        return True
+    sr, sc = source_pos
+    tr, tc = target_pos
+    dr = tr - sr
+    dc = tc - sc
 
-    source_row, source_col = source_pos
-    target_row, target_col = target_pos
+    # Normalize direction to unit step in each axis
+    row_step = dr // max(1, abs(dr))
+    col_step = dc // max(1, abs(dc))
 
-    change_in_row = target_row - source_row
-    change_in_col = target_col - source_col
-
-    # Normalize steps to be between 1, 0, and -1
-    row_step = change_in_row // max(1, abs(change_in_row))
-    col_step = change_in_col // max(1, abs(change_in_col))
-
-    current_row = source_row + row_step
-    current_col = source_col + col_step
-
-    while (current_row, current_col) != (target_row, target_col):
-        current_piece = board[current_row][current_col]
-
-        if current_piece != EMPTY:
+    # Step one square at a time from source towards target (excluding endpoints)
+    r, c = sr + row_step, sc + col_step
+    while (r, c) != (tr, tc):
+        if board[r][c] != EMPTY:
             return False
-
-        current_row += row_step
-        current_col += col_step
+        r += row_step
+        c += col_step
 
     return True
 
 
 def gen_valid_moves(board, history, white_to_move, source_piece, source_pos, castling_rights):
     """
-    Generates the available move space for the selected piece.
-    This works by simulating all possible target locations and
-    exhaustively validating the move until a valid move is reached.
-
-    Yields:
-        target_pos: the position of the target piece
-        bool: True if the move is valid, False otherwise.
+    Iterate over every square on the board, instantiate a hypothetical move,
+    and yield whether it is valid for the given source_piece.
     """
-
-    source_color = source_piece[0] # Necessary for pawn moves
+    source_color = source_piece[0]  # 'w' or 'b'
 
     for row in range(BOARD_SIZE):
         for col in range(BOARD_SIZE):
             target_piece = board[row][col]
             target_pos = (row, col)
-            target_color = target_piece[0]
-
             move = [source_pos, target_pos]
+
+            # Instantiate a piece object for move-specific validation
             piece = _get_piece_object(move, source_piece, target_piece, history, castling_rights)
+            is_white_piece = (source_color == 'w')
 
-            is_white_piece = True if source_color == 'w' else False
-
-            # Turn validation
+            # Enforce turn order
             if white_to_move and not is_white_piece:
                 yield target_pos, False
                 continue
-
             if not white_to_move and is_white_piece:
                 yield target_pos, False
                 continue
 
-            # Cannot attack friendly squares
-            if source_color == target_color:
+            # Prevent capturing own piece
+            if source_color == target_piece[0]:
                 yield target_pos, False
                 continue
 
+            # Piece-specific movement rules
             is_valid_piece, _ = piece.validate()
-
             if not is_valid_piece:
                 yield target_pos, False
                 continue
 
+            # Check for blocking pieces along the path
             if not _is_path_clear(board, source_piece, source_pos, target_pos):
                 yield target_pos, False
                 continue
@@ -157,157 +149,123 @@ def gen_valid_moves(board, history, white_to_move, source_piece, source_pos, cas
 class Move:
     def __init__(self, board, history, white_to_move):
         """
-        Initializes a Move object.
-
-        Parameters:
-        source_pos (tuple): The starting position of the move (row, col).
-        end_pos (tuple): The ending position of the move (row, col).
-        board (list): The current state of the chess board.
+        Track move context including the board state, move history,
+        whose turn it is, and castling rights.
         """
-
         self.board = board
         self.history = history
         self.white_to_move = white_to_move
-
-        # For castling rights
-        self.castling_rights = {'w_kingside': True, 'w_queenside': True,
-                                'b_kingside': True, 'b_queenside': True}
+        # All castling rights start as available
+        self.castling_rights = {
+            'w_kingside': True, 'w_queenside': True,
+            'b_kingside': True, 'b_queenside': True
+        }
 
     def validate(self, source_pos, target_pos):
         """
-        Checks if the move is valid based on the current board state.
-
-        Returns:
-        bool: True if the move is valid, False otherwise.
+        Validate a single move from source_pos to target_pos.
+        Returns (is_valid, move_type) where move_type describes special moves.
         """
-
         source_piece = piece_name(self.board, source_pos)
         target_piece = piece_name(self.board, target_pos)
+        src_color = source_piece[0]
+        is_white_piece = (src_color == 'w')
 
-        source_color = source_piece[0]
-        target_color = target_piece[0]
-
-        is_white_piece = True if source_color == 'w' else False
-
-        # Turn validation
+        # Turn order check
         if self.white_to_move and not is_white_piece:
             return False, None
-        
         if not self.white_to_move and is_white_piece:
             return False, None
 
-        # Cannot attack friendly squares
-        if source_color == target_color:
+        # Cannot capture own color
+        if src_color == target_piece[0]:
             return False, None
 
-        # For piece-specific validation
+        # Build piece instance for detailed validation
         move = [source_pos, target_pos]
         piece = _get_piece_object(move, source_piece, target_piece,
                                   self.history, self.castling_rights)
-
         is_valid_piece, move_type = piece.validate()
-
         if not is_valid_piece:
             return False, None
 
-        is_path_clear = _is_path_clear(self.board, source_piece,
-                                       source_pos, target_pos)
-
-        if not is_path_clear:
+        # Ensure path is not obstructed
+        if not _is_path_clear(self.board, source_piece, source_pos, target_pos):
             return False, None
 
+        # Commit turn flip and update castling availability
         self.white_to_move = not self.white_to_move
-
-        source_type = source_piece[1]
-        self.update_castle(source_pos, source_type, source_color)
+        self.update_castle(source_pos, source_piece[1], src_color)
 
         return True, move_type
 
-
     def update_castle(self, source_pos, source_type, source_color):
+        """
+        Disable castling rights when a king or rook moves from its
+        original square.
+        """
         if source_type == 'K':
+            # King moved: both sides of castling are now invalid
             self.castling_rights[f'{source_color}_kingside'] = False
             self.castling_rights[f'{source_color}_queenside'] = False
-
-        if source_type == 'R':
-            left_rook_pos, right_rook_pos, _, _ = _get_castle_pos(source_color)
-
-            if source_pos == right_rook_pos:
+        elif source_type == 'R':
+            # Identify which rook moved to disable the corresponding side
+            left_rook, right_rook, _, _ = _get_castle_pos(source_color)
+            if source_pos == right_rook:
                 self.castling_rights[f'{source_color}_kingside'] = False
-            elif source_pos == left_rook_pos:
+            elif source_pos == left_rook:
                 self.castling_rights[f'{source_color}_queenside'] = False
 
-
     def log_turn(self):
-        """Prints the turn for troubleshooting purposes."""
-
-        if self.white_to_move:
-            print("turn: white")
-        else:
-            print("turn: black")
+        """Output current turn to console for debugging."""
+        print("turn: white" if self.white_to_move else "turn: black")
 
 
 class Engine:
     def __init__(self):
+        # Use the standard opening position
         self.board = CHESS_BOARD
-
-        move, piece_names = (None, None), (None, None)
-        self.history = [(move, piece_names, CHESS_BOARD)] # Keeps track of board state
-
+        # History entries are tuples: ((src, dst), (src_name, dst_name), board_snapshot)
+        initial_move = (None, None), (None, None), CHESS_BOARD
+        self.history = [initial_move]
 
     def perform_move(self, source_pos, target_pos, special_move):
         """
-        Attempts to make a move and updates the game state accordingly.
-
-        Parameters:
-        source_pos (tuple): The starting position of the move (row, col).
-        source_pos (tuple): The ending position of the move (row, col).
-
-        Returns:
-        bool: True if the move was successfully made, False otherwise.
+        Execute a move on the board, handling en passant and castling.
+        Appends the new position to history.
         """
-
-        source_row, source_col = source_pos
-        target_row, target_col = target_pos
+        sr, sc = source_pos
+        tr, tc = target_pos
 
         source_name = piece_name(self.board, source_pos)
         target_name = piece_name(self.board, target_pos)
 
-        self.board[target_row][target_col] = self.board[source_row][source_col]
-        self.board[source_row][source_col] = EMPTY
+        # Move the piece on the board
+        self.board[tr][tc] = self.board[sr][sc]
+        self.board[sr][sc] = EMPTY
 
         if special_move == "en passant":
-            source_color = source_name[0]
-            if source_color == 'w':
-                en_passant_row = target_row + 1
-            else:
-                en_passant_row = target_row - 1
-
-            en_passant_col = target_col
-            self.board[en_passant_row][en_passant_col] = EMPTY
+            # Remove the pawn that was jumped over
+            direction = 1 if source_name[0] == 'w' else -1
+            self.board[tr + direction][tc] = EMPTY
 
         if special_move == "castle":
-            source_color = source_name[0]
-            left_rook, right_rook, queenside, kingside = _get_castle_pos(source_color)
-
+            # Reposition the rook accordingly
+            color = source_name[0]
+            left_rook, right_rook, queenside, kingside = _get_castle_pos(color)
             if target_pos == queenside:
-                rook_row, rook_col = left_rook
-                king_row, king_col = source_pos
-
-                self.board[rook_row][rook_col+3] = self.board[rook_row][rook_col]
-                self.board[king_row][king_col-3] = self.board[king_row][king_col]
-                self.board[rook_row][rook_col] = EMPTY
-                self.board[king_row][king_col] = EMPTY
+                rr, rc = left_rook
+                # Move rook next to new king position
+                self.board[rr][rc + 3] = self.board[rr][rc]
+                # Clear the old rook and king squares
+                self.board[rr][rc] = EMPTY
+                self.board[sr][sc] = EMPTY
             elif target_pos == kingside:
-                rook_row, rook_col = right_rook
-                king_row, king_col = source_pos
+                rr, rc = right_rook
+                self.board[rr][rc - 2] = self.board[rr][rc]
+                self.board[rr][rc] = EMPTY
+                self.board[sr][sc] = EMPTY
 
-                self.board[rook_row][rook_col-2] = self.board[rook_row][rook_col]
-                self.board[king_row][king_col+3] = self.board[king_row][king_col]
-                self.board[rook_row][rook_col] = EMPTY
-                self.board[king_row][king_col] = EMPTY
-
+        # Record move in history with current board reference
         new_entry = ((source_pos, target_pos), (source_name, target_name), self.board)
         self.history.append(new_entry)
-
-
