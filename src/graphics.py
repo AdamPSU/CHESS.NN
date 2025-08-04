@@ -4,11 +4,20 @@ from config import *
 IMAGES = {}
 
 def draw_rect(row, col):
+    """
+    Creates a rectangle object at a specified grid position.
+
+    Args:
+        row (int): The row index of the rectangle.
+        col (int): The column index of the rectangle.
+
+    Returns:
+        pg.Rect: A rectangle object representing the tile at the specified position.
+    """
+    # Calculate the rectangle's position and size based on the grid and tile size
     rect = pg.Rect(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE)
 
     return rect
-
-
 def load_pieces():
     """
     Load chess pieces. This will only be done once, at the start of the
@@ -111,9 +120,21 @@ def _highlight_tile(screen, tile):
 
 
 def graphics(screen, board, highlighted):
+    """
+    Updates the game graphics by loading the grid, highlighting selected tiles, and updating game pieces.
+
+    Args:
+        screen: The game screen object.
+        board: The current state of the game board.
+        highlighted: A collection of highlighted tile positions.
+    """
+    # Load the grid onto the screen
     load_grid(screen)
 
+    # Highlight each selected tile on the screen
     for tile in highlighted:
         _highlight_tile(screen, tile)
 
+    # Update the game pieces on the screen based on the current board state
     update_pieces(screen, board)
+```

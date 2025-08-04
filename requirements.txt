@@ -1,2 +1,7 @@
-numpy
-pygame
+```python
+# Import the numpy library for efficient numerical computations
+import numpy
+
+# Import the pygame library for game development and interactive applications
+import pygame
+```
